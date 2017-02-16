@@ -1,15 +1,8 @@
 """
-Class and associated functions to read in the grids from LIME when produced via
-the par->gridOutFiles[3] parameter. Note that the grids will have units in [m]
-and [/m^3], but we work in [au] and [kg/cm^3].
+Part of the limepy package.
 
-Here we assume that the models have either H2 or the oH2 / pH2 ensemble as the
-main collision partner and that the abundance is relative to the total density.
-
-We only load up low levels to save time. This can be increases manually.
-
-When working on emission, the lower transition is specified. TODO: Extend this
-to non linear rotators.
+Tools to read in and analyse the files produced with the `gridOutFile[3]`
+parameter in LIME.
 """
 
 import numpy as np
@@ -19,7 +12,7 @@ from scipy.interpolate import griddata
 from analyseLIME.readLAMDA import ratefile
 
 
-class limegrid:
+class outputgrid:
 
     def __init__(self, path, rates=None, **kwargs):
         """Read in the grid FITS file."""
@@ -166,7 +159,7 @@ class limegrid:
 
     def estimate_grids(self, **kwargs):
         """Return grids based on points."""
-        npts = kwargs.get('npts', 100)
+        npts = kwargs.get('npts', 500)
         assert type(npts) == int
         xmin = self.rvals.min()
         xmax = self.rvals.max() * 1.05
