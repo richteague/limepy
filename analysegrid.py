@@ -309,7 +309,7 @@ class outputgrid:
         else:
             raise ValueError("unit must be 'au' or 'cm'.")
 
-    def exictiationtemperature(self, level):
+    def excitiationtemperature(self, level):
         """Two level excitation temperature [K]."""
         T = self.levelpop(level) * self.rates.g[level+1]
         T /= self.levelpop(level+1) * self.rates.g[level]

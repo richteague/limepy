@@ -142,18 +142,10 @@ class cube:
 
     def radialbins(self, bins=None, nbins=None, **kwargs):
         """Returns the radial bins."""
-
-        # bins specifies the bin edges used for np.digitize.
-        # nbins, therefore, is len(bins) - 1.
-
         if bins is None and nbins is None:
             raise ValueError("Specify either 'bins' or 'nbins'.")
         if bins is not None and nbins is not None:
             raise ValueError("Specify either 'bins' or 'nbins'.")
-
-        # By default return bins from 0 to the the edge of
-        # the image.
-
         if bins is None:
             return np.linspace(0., self.posax.max(), nbins+1)
         return bins
