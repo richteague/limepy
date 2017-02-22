@@ -105,7 +105,7 @@ class cube:
             return np.amax(self.line, axis=0)
         return np.amax(self.data, axis=0)
 
-    def integratedintensity(self, **kwargs):
+    def spectrum(self, **kwargs):
         """Integrated intensity."""
         if kwargs.get('removecont', True):
             return np.squeeze([np.sum(c) for c in self.line])

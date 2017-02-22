@@ -340,6 +340,23 @@ class outputgrid:
             return p.T
         return self.percentilestoerrors(p.T)
 
+    def machnumber(self, level):
+        """Flux weighted Mach number of the turbulence."""
+        temp = self.fluxweighted('gtemp', level)
+        turb = self.fluxweighted('turb', level)
+        cs = np.sqrt(sc.k * temp[0] / 2.34 / sc.m_p)
+        return turb / cs
+
+    def opticaldepth(self, level, **kwargs):
+        """Flux weighted optical depth."""
+        v = np.cumsum(self.tau(level)[::-1], axis=0)[::-1]
+        f = self.cell_contribution(level)
+        p = np.array([self.wpercentiles(v[:, i], f[:, i])
+                      for i in xrange(self.xgrid.size)])
+        if kwargs.get('percentiles', False):
+            return p.T
+        return self.percentilestoerrors(p.T)
+
     @staticmethod
     def wpercentiles(data, weights, percentiles=[0.16, 0.5, 0.84]):
         '''Weighted percentiles.'''
