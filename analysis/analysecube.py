@@ -13,7 +13,7 @@ Functions to do:
 """
 
 import numpy as np
-from astropy.io.fits import fits
+from astropy.io import fits
 import scipy.constants as sc
 
 
@@ -202,7 +202,7 @@ class cube:
     def readspectralaxis(self):
         """Returns the spectral axis in Hz."""
         nu = fits.getval(self.filename, 'restfreq', 0)
-        return self.readVelocityAxis() * nu / sc.c
+        return self.readvelocityaxis() * nu / sc.c
 
     def readheader(self, **kwargs):
         """Reads the model properties."""

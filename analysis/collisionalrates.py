@@ -38,7 +38,7 @@ level; rate coefficients (cm3s-1) at each temperature.
 import numpy as np
 
 
-class ratefile:
+class readrates:
 
     names = ['H2', 'pH2', 'oH2', 'electrons', 'H', 'He', 'H+']
     ID = {name: i for name, i in enumerate(names)}
@@ -55,7 +55,7 @@ class ratefile:
         self.nlevels = int(self.filein[5].strip())
         self.ntransitions = int(self.filein[8+self.nlevels].strip())
         self.npartners = int(self.filein[11+self.nlevels+self.ntransitions].strip())
-        sself.trans, self.up, self.down, self.A, self.freq, self.Eup = readin
+        self.trans, self.up, self.down, self.A, self.freq, self.Eup = readin
         # Read in the partner names and the bounding line values.
         self.partners = []
         self.linestarts = []
