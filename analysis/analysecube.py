@@ -26,13 +26,22 @@ class cube:
         # Read in the cube and the appropriate axes. Currently assume that the
         # position axes are the same.
 
-        self.data = fits.getdata(self.filename, 0)
-        self.velax = self.readvelocityaxis()
-        self.nchan = self.velax.size
+        self.data = np.squeeze(fits.getdata(self.filename, 0))
         self.posax = self.readpositionaxis()
         self.npix = self.posax.size
-        self.specax = self.readspectralaxis()
-        self.unit = fits.getval(self.filename, 'bunit', 0)
+        self.dpix = np.diff(self.posax).mean()
+        try:
+            self.nu = fits.getval(self.filename, 'restfreq', 0)
+        except KeyError:
+            self.nu = fits.getval(self.filename, 'restfrq', 0)
+        if fits.getval(self.filename, 'ctype3').lower() == 'freq':
+            self.specax = self.readspectralaxis()
+            self.velax = (self.nu - self.specax) * sc.c / self.nu / 1e3
+        else:
+            self.velax = self.readvelocityaxis()
+            self.specax = self.velax * 1e3 * self.nu / sc.c
+        self.nchan = self.velax.size
+        self.unit = fits.getval(self.filename, 'bunit').lower()
 
         # Parse the information about the geometry of the model from the
         # header. If not available, use the **kwargs to fill in. Should warn
@@ -53,6 +62,12 @@ class cube:
 
         self.cont, self.line = self.subtractcontinuum(**kwargs)
         self.totalintensity = np.nansum(self.zerothmoment())
+
+        # Attempt to read beam properties from the header. If none are found,
+        # take values as a pixel size. This allows a quick conversion between
+        # K and Jy/pix or Jy/beam.
+
+        self.bmin, self.bmaj, self.bpa = self.readbeam(**kwargs)
 
         return
 
@@ -80,9 +95,9 @@ class cube:
         y_dep = y_rot / np.cos(self.inc)
         return np.hypot(y_dep, x_dep), np.arctan2(y_dep, x_dep)
 
-    def zerothmoment(self, remove_continuum=True):
+    def zerothmoment(self, **kwargs):
         """Returns the zeroth moment of the data."""
-        if remove_continuum:
+        if kwargs.get('removecont', True):
             return np.trapz(self.line, self.velax, axis=0)
         return np.trapz(self.data, self.velax, axis=0)
 
@@ -104,12 +119,6 @@ class cube:
         if kwargs.get('removecont', True):
             return np.amax(self.line, axis=0)
         return np.amax(self.data, axis=0)
-
-    def spectrum(self, **kwargs):
-        """Integrated intensity."""
-        if kwargs.get('removecont', True):
-            return np.squeeze([np.sum(c) for c in self.line])
-        return np.squeeze([np.sum(c) for c in self.data])
 
     def percentilestoerrors(self, percentiles):
         """Converts [16,50,84] percentiles to <x> +/- dx."""
@@ -133,7 +142,7 @@ class cube:
             return rpnts, self.percentilestoerrors(percentiles)
         return rpnts, percentiles
 
-    def intensityprofile(self, bins=None, nbins=None, **kwargs):
+    def intensityprofile(self, nbins=None, bins=None, **kwargs):
         """Returns the azimutahlly averaged intensity profile."""
         bins = self.radialbins(bins=bins, nbins=nbins)
         zeroth = self.zerothmoment(**kwargs).ravel()
@@ -147,7 +156,7 @@ class cube:
             return rpnts, self.percentilestoerrors(percentiles)
         return rpnts, percentiles
 
-    def radialbins(self, bins=None, nbins=None, **kwargs):
+    def radialbins(self, nbins=None, bins=None, **kwargs):
         """Returns the radial bins."""
         if bins is None and nbins is None:
             raise ValueError("Specify either 'bins' or 'nbins'.")
@@ -187,22 +196,26 @@ class cube:
 
     def readvelocityaxis(self):
         """Return velocity axis in [km/s]."""
-        a_len = fits.getval(self.filename, 'naxis3', 0)
-        a_del = fits.getval(self.filename, 'cdelt3', 0)
-        a_pix = fits.getval(self.filename, 'crpix3', 0)
-        return (np.arange(1, a_len+1) - a_pix) * a_del / 1e3
+        a_len = fits.getval(self.filename, 'naxis3')
+        a_del = fits.getval(self.filename, 'cdelt3')
+        a_pix = fits.getval(self.filename, 'crpix3')
+        a_ref = fits.getval(self.filename, 'crval3')
+        return (a_ref + (np.arange(a_len) - a_pix + 1) * a_del) / 1e3
+
+    def readspectralaxis(self):
+        """Returns the spectral axis in [Hz]."""
+        a_len = fits.getval(self.filename, 'naxis3')
+        a_del = fits.getval(self.filename, 'cdelt3')
+        a_pix = fits.getval(self.filename, 'crpix3')
+        a_ref = fits.getval(self.filename, 'crval3')
+        return a_ref + (np.arange(a_len) - a_pix + 1) * a_del
 
     def readpositionaxis(self):
         """Returns the position axis in ["]."""
-        a_len = fits.getval(self.filename, 'naxis2', 0)
-        a_del = fits.getval(self.filename, 'cdelt2', 0)
-        a_pix = fits.getval(self.filename, 'crpix2', 0)
+        a_len = fits.getval(self.filename, 'naxis2')
+        a_del = fits.getval(self.filename, 'cdelt2')
+        a_pix = fits.getval(self.filename, 'crpix2')
         return 3600. * ((np.arange(1, a_len+1) - a_pix) * a_del)
-
-    def readspectralaxis(self):
-        """Returns the spectral axis in Hz."""
-        nu = fits.getval(self.filename, 'restfreq', 0)
-        return self.readvelocityaxis() * nu / sc.c
 
     def readheader(self, **kwargs):
         """Reads the model properties."""
@@ -212,13 +225,45 @@ class cube:
         azi = self.readvalue('azi', **kwargs)
         return inc, pa, dist, azi
 
-    def readvalue(self, key, **kwargs):
+    def readbeam(self, **kwargs):
+        """Reads in the beam properties."""
+        bmin = self.readvalue('bmin', **kwargs)
+        bmaj = self.readvalue('bmaj', **kwargs)
+        bpa = self.readvalue('bpa', **kwargs)
+        if np.isnan(bmin):
+            bmin = self.dpix
+        else:
+            bmin = np.radians(bmin)
+        if np.isnan(bmaj):
+            bmaj = self.dpix
+        else:
+            bmaj = np.radians(bmaj)
+        return bmin, bmaj, np.radians(bpa)
+
+    def readvalue(self, key, fillval=np.nan, **kwargs):
         """Attempt to read a value from the header."""
         assert type(key) is str
         try:
             value = fits.getval(self.filename, key, 0)
         except:
-            value = kwargs.get(key, np.nan)
-        if np.isnan(value):
-            print('A value for', key, 'cannot be read, assuming NaN.')
+            value = kwargs.get(key, fillval)
         return value
+
+    @property
+    def spectrum(self):
+        """Integrated intensity [Jy]."""
+        tosum = self.line.copy()
+        if self.unit == 'jy/beam':
+            bmin = 3600. * np.degrees(self.bmin)
+            bmaj = 3600. * np.degrees(self.bmaj)
+            tosum *= self.dpix**2 * 4. * np.log(2.) / bmin / bmaj / np.pi
+        elif self.unit == 'k':
+            raise NotImplementedError()
+        return np.squeeze([np.sum(c) for c in tosum])
+
+    @property
+    def Tmb(self):
+        if self.unit.lower() == 'K':
+            return 1.
+        T = 2. * np.log(2.) * sc.c**2 / sc.k / self.nu**2. * 1e-26
+        return T / np.pi / self.bmin / self.bmaj
