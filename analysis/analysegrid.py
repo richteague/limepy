@@ -331,32 +331,32 @@ class outputgrid:
         """Optical depth of each cell."""
         return self.tau_line(level)  # + self.tau_dust(level)
 
-    def cell_intensity(self, level, pixscale=None):
-        """Intensity from each cell in [Jy/sr] or [Jy/pix]."""
+    def tau_cumulative(self, level):
+        """Cumulative optical depth."""
+        tau = self.tau(level)
+        return np.cumsum(tau[::-1], axis=0)[::-1]
+
+    def cell_intensity(self, level):
+        """Intensity from each cell in [Jy/sr]."""
         I = 1e23 * self.S_line(level) * (1. - np.exp(-self.tau(level)))
-        I = np.where(np.isfinite(I), I, 0.0)
-        if pixscale is None:
-            return I
-        return I * self.arcsec2sr(pixscale)
+        return np.where(np.isfinite(I), I, 0.0)
 
     def cell_emission(self, level, pixscale=None):
-        """Intensity from each cell attenuated to disk surface [Jy/area]."""
-        cellint = self.cell_intensity(level, pixscale)
-        cumtaup = np.cumsum(self.tau(level)[::-1], axis=0)[::-1]
-        contrib = cellint * np.exp(-cumtaup)
-        contrib = np.where(np.isfinite(contrib), contrib, 0.0)
-        return contrib
+        """Intensity from each cell attenuated to disk surface [Jy/sr]."""
+        cellint = self.cell_intensity(level)
+        contrib = cellint * np.exp(-self.tau_cumulative(level))
+        return np.where(np.isfinite(contrib), contrib, 0.0)
 
-    def cell_contribution(self, level, pixscale=None, **kwargs):
+    def cell_contribution(self, level, mincont=1e-10):
         """Normalised cell contribution to the intensity."""
-        contrib = self.cell_emission(level, pixscale)
+        contrib = self.cell_emission(level)
         contrib = contrib / np.nansum(contrib, axis=0)
-        mincont = kwargs.get('mincont', 1e-10)
-        return np.where(contrib < mincont, 1e-10, contrib)
+        return np.where(contrib < mincont, mincont, contrib)
 
     def radial_intensity(self, level, pixscale=None):
         """Radial intensity profile [Jy/sr]."""
-        return np.nansum(self.cell_emission(level, pixscale), axis=0)
+        I = np.nansum(self.cell_emission(level), axis=0)
+        return I
 
     def arcsec2sr(self, pixscale):
         """Convert a scale in arcseconds to a steradian."""
