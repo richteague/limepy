@@ -9,34 +9,50 @@ Functions to do:
     > Unit conversion to K.
     > Include velocity structure.
     > Tidy up the masking.
+    > Include dust opacity.
 
 """
 
+import os
 import numpy as np
 from astropy.io import fits
 import scipy.constants as sc
 from scipy.interpolate import griddata
 from analyseLIME.readLAMDA import ratefile
+from scipy.interpolate import interp1d
 
 
 class outputgrid:
 
-    def __init__(self, path, rates=None, **kwargs):
-        """Read in the grid FITS file."""
-        self.path = path
+    def __init__(self, grid=None, molecule=None, rates=None, **kwargs):
+        """Read in and grid the LIME model."""
+
+        if grid is None:
+            raise ValueError('Must provide path to the grid (.ds).')
+        self.path = grid
         self.filename = self.path.split('/')[-1]
         self.hdu = fits.open(self.path)
-        if rates is None:
-            self.rates = rates
+        self.verbose = kwargs.get('verbose', True)
+
+        # -- Collisional Rates --
+        #
+        # The collisional rates are used to identify the frequencies
+        # of the transitions and the statistical weights of the levels.
+        # This currently doesn't support hyperfine components for, e.g., CN.
+        # Can specify just a molecule or the direct path.
+
+        if rates is None and molecule is None:
+            raise ValueError('Must provide molecule or path to the rates.')
+        elif molecule is not None:
+            molecule = molecule.lower()
+            auxdir = '/Users/richardteague/PythonPackages/limepy/aux/'
+            rates = '%s.dat' % molecule
+            if rates in os.listdir(auxdir):
+                self.rates = ratefile(auxdir+rates)
+            else:
+                raise ValueError('Cannot find rates for %s.' % molecule)
         else:
             self.rates = ratefile(rates)
-
-        self.verbose = kwargs.get('verbose', True)
-        if self.verbose:
-            print(self.hdu.info())
-            print('\n')
-            if self.rates is None:
-                print('Warning: no collisional rates provided!\n')
 
         # Currently only important are the grid [1] and level populations [4]
         # from the grid. Both [2] and [3] are for the Delanunay triangulation
@@ -61,8 +77,8 @@ class outputgrid:
         self.pvals = np.arctan2(self.yvals, self.xvals)
         self.tvals = np.arctan2(self.zvals, self.rvals)
 
-        # Physical properties at each cell.
-        # If dtemp == -1, then use gtemp.
+        # Physical properties at each cell. If dtemp == -1, then use gtemp,
+        # this allows us to calculate the dust continuum for the line emission.
 
         self.gtemp = self.grid.data['TEMPKNTC'][self.notsink]
         self.dtemp = self.grid.data['TEMPDUST'][self.notsink]
@@ -90,9 +106,9 @@ class outputgrid:
         self.turb = self.grid.data['TURBDPLR'][self.notsink]
 
         # Mask out all points with a total density of <= min_density, with a
-        # default of 10^3.
+        # default of 10^4.
 
-        self.dmask = self.dens > kwargs.get('min_density', 1e3)
+        self.dmask = self.dens > kwargs.get('min_density', 1e4)
         self.xvals = self.xvals[self.dmask]
         self.yvals = self.yvals[self.dmask]
         self.zvals = self.zvals[self.dmask]
@@ -113,10 +129,14 @@ class outputgrid:
         idxs = [i for i, b in enumerate(self.dmask) if not b]
         self.levels = np.delete(self.levels, idxs, axis=1)
 
-        # Grid the data. If no axes are provided then estimate them.
-        # It is onto these that the data is gridded and subsequent
-        # calculations performed. Note that if log grids are used, it only
-        # returns a grid on the (0, zmax] interval.
+        # -- Gridding Options --
+        #
+        # There are three options here. One can provide the axes either
+        # as an array, otherwise the grids are generated depending on the
+        # points of the model.
+        # By default the grid is logarithmic in the vertical direction but
+        # linear in the radial direction with 500 points in each, however
+        # these are customisable.
 
         grids = kwargs.get('grids', None)
         if grids is None:
@@ -129,54 +149,100 @@ class outputgrid:
                 self.ygrid = grids
             except:
                 raise ValueError('grids = [xgrid, ygrid].')
-        self.npnts = self.xgrid.size
-        self.log = kwargs.get('log', False)
+        self.xpnts = self.xgrid.size
+        self.ypnts = self.ygrid.size
 
         # With the grids, grid the parameters and store them in a dictionary.
-        # Only read in a certain amount of energy levels to quick it quick.
+        # Only read in the first (by default) 5 energy levels, but this can be
+        # increased later with a call to self.grid_levels(j_max).
 
-        method = kwargs.get('method', 'linear')
+        self.method = kwargs.get('method', 'linear')
         if self.verbose:
-            print('Beginning gridding using %s interpolation.' % method)
-            if kwargs.get('log', False):
-                print('Axes are logarithmically spaced.')
-            if method == 'nearest':
+            print('Beginning gridding using %s interpolation.' % self.method)
+            if self.method == 'nearest':
                 print('Warning: neartest may produce unwanted features.')
+
         self.gridded = {}
-        self.gridded['dens'] = self.grid_param(self.dens, method)
-        self.gridded['gtemp'] = self.grid_param(self.gtemp, method)
-        self.gridded['dtemp'] = self.grid_param(self.dtemp, method)
-        self.gridded['abun'] = self.grid_param(self.abun, method)
-        self.gridded['turb'] = self.grid_param(self.turb, method)
+        self.gridded['dens'] = self.grid_param(self.dens, self.method)
+        self.gridded['gtemp'] = self.grid_param(self.gtemp, self.method)
+        self.gridded['dtemp'] = self.grid_param(self.dtemp, self.method)
+        self.gridded['abun'] = self.grid_param(self.abun, self.method)
+        self.gridded['turb'] = self.grid_param(self.turb, self.method)
+        self.gridded['levels'] = {}
+        self.grid_levels(kwargs.get('nlevels', 5))
 
-        self.jmax = kwargs.get('nlevels', 5)
+        # -- Dust Properties --
+        #
+        # Read in the dust opacities. If none are given, use the standard
+        # Jena opacities and load them as an array. They should be two columns
+        # with the wavelength in [um] and the opacities in [cm^2/g]. Returns a
+        # interpolation function which takes frequency in [Hz] and outputs the
+        # opacity in the assumed units. By deafult, the gas-to-dust ratio
+        # currently is set to 100 everywhere.
+
+        self.opacities = kwargs.get('opacities', '../aux/jena_thin_e6.tab')
+        self.opacities = '/Users/richardteague/PythonPackages/limepy/aux/jena_thin_e6.tab'
+        self.opacities = np.loadtxt(self.opacities).T
+        if self.opacities.ndim != 2:
+            raise ValueError("Can't read in dust opacities.")
+        self.opacities = interp1d(sc.c * 1e6 / self.opacities[0][::-1],
+                                  self.opacities[1][::-1], bounds_error=False,
+                                  fill_value="extrapolated")
+        self.g2d = kwargs.get('g2d', 100.)
         if self.verbose:
-            print('Gridding the first %d energy levels.\n' % self.jmax)
-        self.gridded['levels'] = {j: self.grid_param(self.levels[j], method)
-                                  for j in np.arange(self.jmax)}
+            print('Successfully attached dust opacities. Values loaded for')
+            print('%.2f to %.2f GHz.' % (self.opacities.x.min()/1e9,
+                  self.opacities.x.max()/1e9))
+            print('Outside this opacities will be extrapolated.')
+        return
 
+    # -- General use functions. --
+
+    def grid_levels(self, nlevels):
+        """Grid the specified energy levels."""
+        for j in np.arange(nlevels):
+            if j in self.gridded['levels'].keys():
+                continue
+            self.gridded['levels'][j] = self.grid_param(self.levels[j],
+                                                        self.method)
+        self.jmax = max(self.gridded['levels'].keys())
+        if self.verbose:
+            print('Gridded the first %d energy levels.' % (self.jmax + 1))
+            print('Use self.grid_levels() to read in more.\n')
         return
 
     def grid_param(self, param, method='linear'):
         """Return a gridded version of param."""
         return griddata((np.hypot(self.xvals, self.yvals), self.zvals),
                         param, (self.xgrid[None, :], self.ygrid[:, None]),
-                        method=method, fill_value=0.0, rescale=True)
+                        method=method, fill_value=0.0)
 
     def estimate_grids(self, **kwargs):
-        """Return grids based on points."""
+        """Return grids based on points in the model."""
         npts = kwargs.get('npts', 500)
-        assert type(npts) == int
+        xpts = kwargs.get('xnpts', npts)
+        ypts = kwargs.get('ynpts', npts)
         xmin = self.rvals.min()
         xmax = self.rvals.max() * 1.05
+        if kwargs.get('logx', False):
+            xgrid = np.logspace(np.log10(xmin), np.log10(xmax), xpts)
+            if self.verbose:
+                print('Made the xgrid logarithmic.')
+        else:
+            xgrid = np.linspace(xmin, xmax, xpts)
+            if self.verbose:
+                print('Made the xgrid linear.')
         ymin = abs(self.zvals).min()
         ymax = abs(self.zvals).max() * 1.05
-        if kwargs.get('log', False):
-            xgrid = np.logspace(np.log10(xmin), np.log10(xmax), npts)
-            ygrid = np.logspace(np.log10(ymin), np.log10(ymax), npts)
-            return xgrid, ygrid
-        xgrid = np.linspace(xmin, xmax, npts)
-        ygrid = np.linspace(-ymax, ymax, 5*npts)
+        if kwargs.get('logy', True):
+            ygrid = np.logspace(np.log10(ymin), np.log10(ymax), ypts / 2)
+            ygrid = np.hstack([-ygrid[::-1], ygrid])
+            if self.verbose:
+                print('Made the ygrid logarithmic.')
+        else:
+            ygrid = np.linspace(-ymax, ymax, ypts)
+            if self.verbose:
+                print ('Made the ygrid linear.')
         return xgrid, ygrid
 
     @property
@@ -207,39 +273,67 @@ class outputgrid:
         return np.sqrt(dV)
 
     def levelpop(self, level):
-        """Number density of molecules in required level [/ccm]."""
+        """Number density of molecules in selected level [/ccm]."""
         nmol = self.gridded['dens'] * self.gridded['abun'] / 1e6
         return nmol * self.gridded['levels'][level]
 
     def anu(self, level):
         """Absorption coefficient [/cm]."""
         a = 1e4 * sc.c**2 / 8. / np.pi / self.rates.freq[level]**2
-        a *= self.rates.EinsteinA[level]
-        a *= self.phi(level)
+        a *= self.rates.EinsteinA[level] * self.phi(level)
         b = self.rates.g[level+1] / self.rates.g[level]
         b *= self.levelpop(level)
         b -= self.levelpop(level+1)
         a *= b
         return np.where(np.isfinite(a), a, 0.0)
 
-    def jnu(self, level):
-        """Emission coefficient [erg / s / ccm / Hz / sr]."""
-        j = 6.62e-27 * self.phi(level) * self.rates.freq[level] / 4. / np.pi
-        j *= self.levelpop(level+1) * self.rates.EinsteinA[level]
-        return np.where(np.isfinite(j), j, 0.0)
+    def alpha_line(self, level):
+        """Line absorption coefficient [/cm]."""
+        a = 1e4 * sc.c**2 / 8. / np.pi / self.rates.freq[level]**2
+        a *= self.rates.EinsteinA[level] * self.phi(level)
+        b = self.rates.g[level+1] / self.rates.g[level]
+        b *= self.levelpop(level)
+        b -= self.levelpop(level+1)
+        a *= b
+        return np.where(np.isfinite(a), a, 0.0)
 
-    def Snu(self, level):
-        """Source function."""
-        s = self.jnu(level) / self.anu(level)
+    def alpha_dust(self, level):
+        """Dust absorption coefficient [/cm]."""
+        rho = self.gridded['dens'] / 1e6 / self.g2d
+        kappa = self.opacities(self.rates.freq[level])
+        alpha = rho * kappa
+        return np.where(np.isfinite(alpha), alpha, 0.0)
+
+    def S_dust(self, level):
+        """Source function for the dust."""
+        nu = self.rates.freq[level]
+        B = 2. * sc.h * nu**3 / sc.c**2
+        B /= np.exp(sc.h * nu / sc.k / self.gridded['dtemp']) - 1.
+        return np.where(np.isfinite(B), B, 0.0)
+
+    def S_line(self, level):
+        """Source function for the line."""
+        s = 2. * sc.h * self.rates.freq[level]**3 / sc.c**2
+        ss = self.rates.g[level+1] / self.rates.g[level]
+        ss *= self.levelpop(level) / self.levelpop(level+1)
+        s /= (ss - 1.)
         return np.where(np.isfinite(s), s, 0.0)
 
+    def tau_line(self, level):
+        """Optical depth of the line emission."""
+        return self.alpha_line(level) * self.cellsize(self.ygrid)[:, None]
+
+    def tau_dust(self, level):
+        """Optical depth of the dust emission."""
+        return self.alpha_dust(level) * self.cellsize(self.ygrid)[:, None]
+
     def tau(self, level):
-        """Optical depth of each cell.."""
-        return self.anu(level) * self.cellsize(self.ygrid)[:, None]
+        """Optical depth of each cell."""
+        return self.tau_line(level)  # + self.tau_dust(level)
 
     def cell_intensity(self, level, pixscale=None):
         """Intensity from each cell in [Jy/sr] or [Jy/pix]."""
-        I = 1e23 * self.Snu(level) * (1. - np.exp(-self.tau(level)))
+        I = 1e23 * self.S_line(level) * (1. - np.exp(-self.tau(level)))
         I = np.where(np.isfinite(I), I, 0.0)
         if pixscale is None:
             return I
@@ -358,8 +452,10 @@ class outputgrid:
         return self.percentilestoerrors(p.T)
 
     @staticmethod
-    def wpercentiles(data, weights, percentiles=[0.16, 0.5, 0.84]):
+    def wpercentiles(data, weights, percentiles=[0.16, 0.5, 0.84], **kwargs):
         '''Weighted percentiles.'''
+        if kwargs.get('onlypos', True):
+            data = abs(data)
         idx = np.argsort(data)
         sorted_data = np.take(data, idx)
         sorted_weights = np.take(weights, idx)
