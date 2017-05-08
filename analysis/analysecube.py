@@ -263,7 +263,8 @@ class cube:
 
     @property
     def Tmb(self):
-        if self.unit.lower() == 'K':
+        """Conversion to brightness temperature."""
+        if self.unit.upper() == 'K':
             return 1.
         T = 2. * np.log(2.) * sc.c**2 / sc.k / self.nu**2. * 1e-26
         return T / np.pi / self.bmin / self.bmaj
