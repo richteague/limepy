@@ -20,6 +20,7 @@ import scipy.constants as sc
 from scipy.interpolate import griddata
 from analyseLIME.readLAMDA import ratefile
 from scipy.interpolate import interp1d
+import warnings
 
 
 class outputgrid:
@@ -31,8 +32,12 @@ class outputgrid:
             raise ValueError('Must provide path to the grid (.ds).')
         self.path = grid
         self.filename = self.path.split('/')[-1]
+        self.aux = os.path.dirname(os.path.realpath(__file__))
+        self.aux = self.aux.replace('analysis', 'aux/')
         self.hdu = fits.open(self.path)
         self.verbose = kwargs.get('verbose', True)
+        if not self.verbose:
+            warnings.simplefilter("ignore")
 
         # -- Collisional Rates --
         #
@@ -45,10 +50,9 @@ class outputgrid:
             raise ValueError('Must provide molecule or path to the rates.')
         elif molecule is not None:
             molecule = molecule.lower()
-            auxdir = '/Users/richardteague/PythonPackages/limepy/aux/'
             rates = '%s.dat' % molecule
-            if rates in os.listdir(auxdir):
-                self.rates = ratefile(auxdir+rates)
+            if rates in os.listdir(self.aux):
+                self.rates = ratefile(self.aux+rates)
             else:
                 raise ValueError('Cannot find rates for %s.' % molecule)
         else:
@@ -180,8 +184,7 @@ class outputgrid:
         # opacity in the assumed units. By deafult, the gas-to-dust ratio
         # currently is set to 100 everywhere.
 
-        self.opacities = kwargs.get('opacities', '../aux/jena_thin_e6.tab')
-        self.opacities = '/Users/richardteague/PythonPackages/limepy/aux/jena_thin_e6.tab'
+        self.opacities = kwargs.get('opacities', self.aux+'jena_thin_e6.tab')
         self.opacities = np.loadtxt(self.opacities).T
         if self.opacities.ndim != 2:
             raise ValueError("Can't read in dust opacities.")
@@ -223,7 +226,7 @@ class outputgrid:
         xpts = kwargs.get('xnpts', npts)
         ypts = kwargs.get('ynpts', npts)
         xmin = self.rvals.min()
-        xmax = self.rvals.max() * 1.05
+        xmax = self.rvals.max()
         if kwargs.get('logx', False):
             xgrid = np.logspace(np.log10(xmin), np.log10(xmax), xpts)
             if self.verbose:
@@ -244,6 +247,11 @@ class outputgrid:
             if self.verbose:
                 print ('Made the ygrid linear.')
         return xgrid, ygrid
+
+    # -- Physical Properties --
+    #
+    # Simple physical properties of the disk. These should be equal to what the
+    # input values were for the LIME modelling.
 
     @property
     def columndensity(self):
@@ -277,15 +285,50 @@ class outputgrid:
         nmol = self.gridded['dens'] * self.gridded['abun'] / 1e6
         return nmol * self.gridded['levels'][level]
 
-    def anu(self, level):
-        """Absorption coefficient [/cm]."""
-        a = 1e4 * sc.c**2 / 8. / np.pi / self.rates.freq[level]**2
-        a *= self.rates.EinsteinA[level] * self.phi(level)
-        b = self.rates.g[level+1] / self.rates.g[level]
-        b *= self.levelpop(level)
-        b -= self.levelpop(level+1)
-        a *= b
-        return np.where(np.isfinite(a), a, 0.0)
+    # -- Contribution Functions --
+    #
+    # Use cell_intensity(level) to call the cell intensities for each cell.
+    # We can also calculate the emission observed from each cell with the
+    # cell_emission function, or return a normalised and clipped version of
+    # this with cell_contribution. All three functions have the option to
+    # select the source from ['line', 'dust', 'both'].
+
+    def cell_intensity(self, level, source='both'):
+        """Unattenuated intensity [Jy/sr] of each cell."""
+        if source == 'line':
+            return self._line_intensity(level)
+        elif source == 'dust':
+            return self._dust_intensity(level)
+        else:
+            return self._both_intensity(level)
+
+    def cell_emission(self, level, source='both'):
+        """Intensity [Jy/sr] from each cell attenuated to disk surface."""
+        cellint = self.cell_intensity(level, source=source)
+        contrib = cellint * np.exp(-self.tau_cumulative(level, source=source))
+        return np.where(np.isfinite(contrib), contrib, 0.0)
+
+    def cell_contribution(self, level, source='both', mincont=1e-10):
+        """Normalised cell contribution to the observed emission."""
+        contrib = self.cell_emission(level, source=source)
+        contrib = contrib / np.nansum(contrib, axis=0)
+        return np.where(contrib < mincont, mincont, contrib)
+
+    def _both_intensity(self, level):
+        """Cell intensity [Jy/sr] for both line and dust emission."""
+        I = 1e23 * self.S_both(level) * (1. - np.exp(-self.tau_both(level)))
+        return np.where(np.isfinite(I), I, 0.0)
+
+    def _line_intensity(self, level):
+        """Returns the cell intensity [Jy/sr] only considering the line."""
+        I = 1e23 * self.S_line(level) * (1. - np.exp(-self.tau_line(level)))
+        return np.where(np.isfinite(I), I, 0.0)
+
+    def _dust_intensity(self, level):
+        """Returns the cell intensity [Jy/sr] only considering the dust."""
+        I = 1e23 * self.S_dust(level) * (1. - np.exp(-self.tau_dust(level)))
+        return np.where(np.isfinite(I), I, 0.0)
+        return
 
     def alpha_line(self, level):
         """Line absorption coefficient [/cm]."""
@@ -304,6 +347,14 @@ class outputgrid:
         alpha = rho * kappa
         return np.where(np.isfinite(alpha), alpha, 0.0)
 
+    def emiss_line(self, level):
+        """Line emissivity coefficient."""
+        return self.S_line(level) * self.alpha_line(level)
+
+    def emiss_dust(self, level):
+        """Dust emissivity coefficient."""
+        return self.S_dust(level) * self.alpha_dust(level)
+
     def S_dust(self, level):
         """Source function for the dust."""
         nu = self.rates.freq[level]
@@ -319,39 +370,33 @@ class outputgrid:
         s /= (ss - 1.)
         return np.where(np.isfinite(s), s, 0.0)
 
+    def S_both(self, level):
+        """Source function for both line and dust."""
+        source = self.alpha_dust(level) + self.alpha_line(level)
+        source /= self.emiss_dust(level) + self.emiss_line(level)
+        return np.where(np.isfinite(source), source, 0.0)
+
     def tau_line(self, level):
-        """Optical depth of the line emission."""
+        """Optical depth of the line emission for each cell."""
         return self.alpha_line(level) * self.cellsize(self.ygrid)[:, None]
 
     def tau_dust(self, level):
-        """Optical depth of the dust emission."""
+        """Optical depth of the dust emission for each cell."""
         return self.alpha_dust(level) * self.cellsize(self.ygrid)[:, None]
 
-    def tau(self, level):
-        """Optical depth of each cell."""
-        return self.tau_line(level)  # + self.tau_dust(level)
+    def tau_both(self, level):
+        """Total optical depth of each cell."""
+        return self.tau_line(level) + self.tau_dust(level)
 
-    def tau_cumulative(self, level):
+    def tau_cumulative(self, level, source='both'):
         """Cumulative optical depth."""
-        tau = self.tau(level)
+        if source == 'line':
+            tau = self.tau_line(level)
+        elif source == 'dust':
+            tau = self.tau_dust(level)
+        else:
+            tau = self.tau_both(level)
         return np.cumsum(tau[::-1], axis=0)[::-1]
-
-    def cell_intensity(self, level):
-        """Intensity from each cell in [Jy/sr]."""
-        I = 1e23 * self.S_line(level) * (1. - np.exp(-self.tau(level)))
-        return np.where(np.isfinite(I), I, 0.0)
-
-    def cell_emission(self, level, pixscale=None):
-        """Intensity from each cell attenuated to disk surface [Jy/sr]."""
-        cellint = self.cell_intensity(level)
-        contrib = cellint * np.exp(-self.tau_cumulative(level))
-        return np.where(np.isfinite(contrib), contrib, 0.0)
-
-    def cell_contribution(self, level, mincont=1e-10):
-        """Normalised cell contribution to the intensity."""
-        contrib = self.cell_emission(level)
-        contrib = contrib / np.nansum(contrib, axis=0)
-        return np.where(contrib < mincont, mincont, contrib)
 
     def radial_intensity(self, level, pixscale=None):
         """Radial intensity profile [Jy/sr]."""
@@ -362,7 +407,7 @@ class outputgrid:
         """Convert a scale in arcseconds to a steradian."""
         return np.power(pixscale, 2.) * 2.35e-11
 
-    def phi(self, level):
+    def phi(self, level, offset=0.0):
         """Line fraction at line centre [/Hz]."""
         dnu = self.linewidth * self.rates.freq[level] / sc.c
         return 1. / dnu / np.sqrt(2. * np.pi)
@@ -373,11 +418,19 @@ class outputgrid:
         func /= dx * np.sqrt(2. * np.pi)
         return np.where(np.isfinite(func), func, 0.0)
 
+    # -- Weighted Properties --
+    #
+    # Use these functions to look at the abundance or flux weighted properties
+    # of the disk model. The parameter must be a gridded property (that is, in
+    # self.gridded.keys()) and the result can be returned as the [16, 50, 84]
+    # percentiles or as [50, 50-16, 84-50] for error bar plotting.
+
     def fluxweighted(self, param, level, **kwargs):
         """Flux weighted percentiles of physical property."""
         if param not in self.gridded.keys():
             raise ValueError('Not valid parameter.')
-        f = self.cell_contribution(level)
+        s = kwargs.get('source', 'both')
+        f = self.cell_contribution(level, source=s)
         v = self.gridded[param]
         p = np.array([self.wpercentiles(v[:, i], f[:, i])
                       for i in xrange(self.xgrid.size)])
@@ -418,7 +471,8 @@ class outputgrid:
 
     def emissionlayer(self, level, **kwargs):
         """Percentiles for the dominant emission layer [au]."""
-        f = self.cell_contribution(level)
+        s = kwargs.get('source', 'both')
+        f = self.cell_contribution(level, source=s)
         p = np.array([self.wpercentiles(self.ygrid, f[:, i])
                       for i in xrange(self.xgrid.size)])
         if kwargs.get('percentiles', False):
@@ -438,7 +492,7 @@ class outputgrid:
         """Flux weighted Mach number of the turbulence."""
         temp = self.fluxweighted('gtemp', level)
         turb = self.fluxweighted('turb', level)
-        cs = np.sqrt(sc.k * temp[0] / 2.34 / sc.m_p)
+        cs = np.sqrt(sc.k * temp[0] / 2.35 / sc.m_p)
         return turb / cs
 
     def opticaldepth(self, level, **kwargs):
@@ -450,6 +504,10 @@ class outputgrid:
         if kwargs.get('percentiles', False):
             return p.T
         return self.percentilestoerrors(p.T)
+
+    # -- Static Methods --
+    #
+    # Simple functions to aid with the calculations.
 
     @staticmethod
     def wpercentiles(data, weights, percentiles=[0.16, 0.5, 0.84], **kwargs):
