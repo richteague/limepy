@@ -17,8 +17,8 @@ import os
 import numpy as np
 from astropy.io import fits
 import scipy.constants as sc
+from limepy.analysis.collisionalrates import ratefile
 from scipy.interpolate import griddata
-from analyseLIME.readLAMDA import ratefile
 from scipy.interpolate import interp1d
 import warnings
 
@@ -210,7 +210,7 @@ class outputgrid:
                                                         self.method)
         self.jmax = max(self.gridded['levels'].keys())
         if self.verbose:
-            print('Gridded the first %d energy levels.' % (self.jmax + 1))
+            print('Gridded the first %d energy levels.' % (self.jmax+1))
             print('Use self.grid_levels() to read in more.\n')
         return
 
@@ -282,6 +282,8 @@ class outputgrid:
 
     def levelpop(self, level):
         """Number density of molecules in selected level [/ccm]."""
+        if level not in self.gridded['levels'].keys():
+            self.grid_levels(level+1)
         nmol = self.gridded['dens'] * self.gridded['abun'] / 1e6
         return nmol * self.gridded['levels'][level]
 

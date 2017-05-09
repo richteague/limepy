@@ -1,93 +1,144 @@
 """
 Part of the limepy package.
 
-Functions and classes to ease reading and parsing the collisional rates used
-for LIME obtained from LAMDA (http://home.strw.leidenuniv.nl/~moldata/).
+Tools to read in the collisional rate data from LAMDA.
 
 Functions to do:
 
-    > Tidy everything up.
-
-From LAMDA, the format of the files:
-
-Lines 1-2: molecule (or atom) name
-Lines 3-4: molecular (or atomic) weight (a.m.u.)
-Lines 5-6: number of energy levels (NLEV)
-Lines 7-7+NLEV: level number, level energy (cm-1), statistical weight. These
-numbers may be followed by additional info such as the quantum numbers, which
-are however not used by the program. The levels must be listed in order of
-increasing energy.
-Lines 8+NLEV-9+NLEV: number of radiative transitions (NLIN)
-Lines 10+NLEV-10+NLEV+NLIN: transition number, upper level, lower level,
-spontaneous decay rate (s-1). These numbers may be followed by additional info
-such as the line frequency, which is however not used by the program.
-Lines 11+NLEV+NLIN-12+NLEV+NLIN: number of collision partners
-Lines 13+NLEV+NLIN-14+NLEV+NLIN: collision partner ID and reference. Valid
-identifications are: 1=H2, 2=para-H2, 3=ortho-H2, 4=electrons, 5=H, 6=He.
-Lines 15+NLEV+NLIN-16+NLEV+NLIN: number of transitions for which collisional
-data exist (NCOL)
-Lines 17+NLEV+NLIN-18+NLEV+NLIN: number of temperatures for which collisional
-data exist
-Lines 19+NLEV+NLIN-20+NLEV+NLIN: values of temperatures for which collisional
-data exist
-Lines 21+NLEV+NLIN-21+NLEV+NLIN+NCOL: transition number, upper level, lower
-level; rate coefficients (cm3s-1) at each temperature.
+    > Tidy up collisional rates.
+    > Consider non-basic linear rotators.
 
 """
 
+import os
 import numpy as np
 
+# -- Collisional Partners --
+#
+# Diciontary to swap between collisional partner names and LAMDA values.
 
-class readrates:
+coll_ID = {}
+names = ['H2', 'pH2', 'oH2', 'e', 'H', 'He', 'Hplus']
+for i, name in enumerate(names):
+    coll_ID[name] = i + 1
+    coll_ID[i + 1] = name
 
-    names = ['H2', 'pH2', 'oH2', 'electrons', 'H', 'He', 'H+']
-    ID = {name: i for name, i in enumerate(names)}
 
-    def __init__(self, fn):
+class energylevel:
+    """Energy levels of the molecule."""
+    def __init__(self, l, E, g, J):
+        self.level = int(l)
+        self.E = float(E)
+        self.g = int(g)
+        self.J = int(J)
+        return
+
+
+class transition:
+    """Radiative transitions of the molecule."""
+    def __init__(self, t, Jup, Jlo, A, freq, Eup):
+        self.trans = int(t)
+        self.Jup = int(Jup)
+        self.Jlo = int(Jlo)
+        self.A = float(A)
+        self.freq = float(freq) * 1e9
+        self.Eup = float(Eup)
+        return
+
+
+class collrates:
+    """Collisional rates of the molecule and given partner."""
+    def __init__(self, trans, temps, tup, tlo, rates):
+        self.trans = trans
+        self.temps = temps
+        self.tup = tup
+        self.tlo = tlo
+        self.rates = rates
+        return
+
+
+class ratefile:
+    """LAMDA collisional rate data file."""
+    def __init__(self, molecule, verbose=False):
+        self.verbose = verbose
+
+        # Initially search for the molecule in the aux directory.
+        # If not there, assume it is a direct path.
+
+        self.aux = '/Users/richardteague/PythonPackages/limepy/aux/'
+        rates = '%s.dat' % molecule.lower()
+        if rates in os.listdir(self.aux):
+            fn = self.aux+rates
+        else:
+            fn = molecule
+
         with open(fn) as f:
             self.filein = f.readlines()
-
 
         self.molecule = self.filein[1].strip()
         self.mu = float(self.filein[3].strip())
         self.nlev = int(self.filein[5].strip())
+        if self.verbose:
+            print('Molecule: %s.' % self.molecule)
+            print('Molecular weight: %d.' % self.mu)
+            print('Energy levels: %d.' % self.nlev)
 
-        self.nlevels = int(self.filein[5].strip())
-        self.ntransitions = int(self.filein[8+self.nlevels].strip())
-        self.npartners = int(self.filein[11+self.nlevels+self.ntransitions].strip())
-        self.trans, self.up, self.down, self.A, self.freq, self.Eup = readin
-        # Read in the partner names and the bounding line values.
-        self.partners = []
-        self.linestarts = []
-        self.lineends = []
-        n = 0
-        linestart = 12+self.nlevels+self.ntransitions
-        while n < self.npartners:
-            self.linestarts.append(linestart)
-            names = np.array(['H2', 'pH2', 'oH2', 'electrons', 'H', 'He', 'H+'])
-            name = names[int(self.filein[linestart+1][0])-1]
-            lineend = linestart+9+int(self.filein[linestart+3].strip())
-            self.partners.append(name)
-            self.lineends.append(lineend)
-            linestart = lineend
-            n += 1
+        self.levels = {}
+        for line in range(self.nlev):
+            self.populate_levels(self.filein[7+line].strip())
 
-        # Read in the energy level structure.
-        self.levels = self.filein[7:7+self.nlevels]
-        self.levels = np.array([[float(n) for n in levelsrow.strip().split()]
-                                 for levelsrow in self.levels]).T
+        self.nlin = int(self.filein[8+self.nlev])
+        if self.verbose:
+            print('Radiative transitions: %d.' % self.nlin)
+        self.transitions = {}
+        for line in range(self.nlin):
+            self.populate_transitions(self.filein[10+self.nlev+line])
 
-        # Read in the radiative transitions.
-        self.transitions = self.filein[10+self.nlevels:10+self.nlevels+self.ntransitions]
-        self.transitions = np.array([[float(n) for n in transrow.strip().split()]
-                                      for transrow in self.transitions]).T
+        self.ncoll = int(self.filein[11+self.nlev+self.nlin])
+        if self.verbose:
+            print('Number of collision partners: %d.' % self.ncoll)
+        self.collisions = {}
+        self.cl = 13 + self.nlev + self.nlin
 
-        # Split into appropriate arrays.
-        self.deltaE = self.levels[1]
-        self.weights = self.levels[2]
-        self.J = self.levels[3]
-        self.EinsteinA = self.transitions[3]
-        self.frequencies = self.transitions[4] * 1e9
-        self.E_upper = self.transitions[5]
+        for i in range(self.ncoll):
+            # Populate the collisional rates.
+            ID = int(self.filein[self.cl][0])
+            name = coll_ID[ID]
+            ntrans = int(self.filein[self.cl+2])
+            temps = self.filein[self.cl+6]
+            temps = [float(x) for x in temps.split(' ') if x != '']
+            temps = np.array(temps)
+            if self.verbose:
+                s = 'Collisions with %s ' % name
+                s += 'have %d transitions ' % ntrans
+                s += 'at %d temperatures.' % temps.size
+                print(s)
+            self.populate_collisions(self.cl, ID, ntrans, temps)
+            self.cl += ntrans + 9
 
+        return
+
+    def populate_levels(self, line):
+        """Populate self.lines."""
+        L, E, g, J = [float(x) for x in line.split(' ') if x != '']
+        self.levels[int(L)] = energylevel(L, E, g, J)
+        return
+
+    def populate_transitions(self, line):
+        """Populate self.transitions."""
+        line = [float(x) for x in line.split(' ') if x != '']
+        t, Jup, Jlo, A, freq, Eup = line
+        self.transitions[int(t)] = transition(t, Jup, Jlo, A, freq, Eup)
+        return
+
+    def populate_collisions(self, cl, ID, ntrans, temps):
+        """Populate self.collisions."""
+        rates = self.filein[self.cl+8:self.cl+8+ntrans]
+        rates = np.array([np.fromstring(rates[0], sep=' ') for l in rates]).T
+        trans = rates[0]
+        tup = rates[1]
+        tlo = rates[2]
+        rates = rates[3:]
+        self.collisions[ID] = collrates(trans, temps, tup, tlo, rates)
+        self.collisions[coll_ID[ID]] = self.collisions[ID]
         return
