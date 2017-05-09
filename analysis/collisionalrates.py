@@ -71,9 +71,10 @@ class ratefile:
             fn = self.aux+rates
         else:
             fn = molecule
-
         with open(fn) as f:
             self.filein = f.readlines()
+
+        # Basic data about the molecule.
 
         self.molecule = self.filein[1].strip()
         self.mu = float(self.filein[3].strip())
@@ -83,9 +84,13 @@ class ratefile:
             print('Molecular weight: %d.' % self.mu)
             print('Energy levels: %d.' % self.nlev)
 
+        # Energy levels.
+
         self.levels = {}
         for line in range(self.nlev):
             self.populate_levels(self.filein[7+line].strip())
+
+        # Radiative transitions.
 
         self.nlin = int(self.filein[8+self.nlev])
         if self.verbose:
@@ -94,6 +99,8 @@ class ratefile:
         for line in range(self.nlin):
             self.populate_transitions(self.filein[10+self.nlev+line])
 
+        # Collisional rates. Will loop through all the found collisional rates.
+
         self.ncoll = int(self.filein[11+self.nlev+self.nlin])
         if self.verbose:
             print('Number of collision partners: %d.' % self.ncoll)
@@ -101,7 +108,6 @@ class ratefile:
         self.cl = 13 + self.nlev + self.nlin
 
         for i in range(self.ncoll):
-            # Populate the collisional rates.
             ID = int(self.filein[self.cl][0])
             name = coll_ID[ID]
             ntrans = int(self.filein[self.cl+2])
@@ -115,6 +121,8 @@ class ratefile:
                 print(s)
             self.populate_collisions(self.cl, ID, ntrans, temps)
             self.cl += ntrans + 9
+
+        self.partners = [x for x in self.collisions.keys() if type(x) == str]
 
         return
 
