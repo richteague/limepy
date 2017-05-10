@@ -25,7 +25,7 @@ import warnings
 
 class outputgrid:
 
-    def __init__(self, grid=None, molecule=None, rates=None, **kwargs):
+    def __init__(self, grid=None, rates=None, **kwargs):
         """Read in and grid the LIME model."""
 
         if grid is None:
@@ -46,17 +46,7 @@ class outputgrid:
         # This currently doesn't support hyperfine components for, e.g., CN.
         # Can specify just a molecule or the direct path.
 
-        if rates is None and molecule is None:
-            raise ValueError('Must provide molecule or path to the rates.')
-        elif molecule is not None:
-            molecule = molecule.lower()
-            rates = '%s.dat' % molecule
-            if rates in os.listdir(self.aux):
-                self.rates = ratefile(self.aux+rates)
-            else:
-                raise ValueError('Cannot find rates for %s.' % molecule)
-        else:
-            self.rates = ratefile(rates)
+        self.rates = ratefile(rates)
 
         # Currently only important are the grid [1] and level populations [4]
         # from the grid. Both [2] and [3] are for the Delanunay triangulation
@@ -203,14 +193,15 @@ class outputgrid:
 
     def grid_levels(self, nlevels):
         """Grid the specified energy levels."""
-        for j in np.arange(nlevels):
+        for jj in np.arange(nlevels):
+            j = jj + 1
             if j in self.gridded['levels'].keys():
                 continue
             self.gridded['levels'][j] = self.grid_param(self.levels[j],
                                                         self.method)
         self.jmax = max(self.gridded['levels'].keys())
         if self.verbose:
-            print('Gridded the first %d energy levels.' % (self.jmax+1))
+            print('Gridded the first %d energy levels.' % (self.jmax))
             print('Use self.grid_levels() to read in more.\n')
         return
 
@@ -274,6 +265,10 @@ class outputgrid:
         """Returns the local total linewidth (stdev.) in [m/s]."""
         return np.hypot(self.gridded['turb'], self.thermalwidth)
 
+    def linewidth_freq(self, trans):
+        """Returns the frequency equivalent linewidth (stdev.) in [Hz]."""
+        return self.linewidth * self.frequency(trans) / sc.c
+
     @property
     def thermalwidth(self):
         """Returns the local thermal width in [m/s]."""
@@ -295,124 +290,134 @@ class outputgrid:
     # this with cell_contribution. All three functions have the option to
     # select the source from ['line', 'dust', 'both'].
 
-    def cell_intensity(self, level, source='both'):
+    def cell_intensity(self, trans, **kwargs):
         """Unattenuated intensity [Jy/sr] of each cell."""
+        source = kwargs.get('source', 'both')
         if source == 'line':
-            return self._line_intensity(level)
+            return self._line_intensity(trans, **kwargs)
         elif source == 'dust':
-            return self._dust_intensity(level)
+            return self._dust_intensity(trans, **kwargs)
         else:
-            return self._both_intensity(level)
+            return self._both_intensity(trans, **kwargs)
 
-    def cell_emission(self, level, source='both'):
+    def cell_emission(self, trans, **kwargs):
         """Intensity [Jy/sr] from each cell attenuated to disk surface."""
-        cellint = self.cell_intensity(level, source=source)
-        contrib = cellint * np.exp(-self.tau_cumulative(level, source=source))
+        cellint = self.cell_intensity(trans, **kwargs)
+        contrib = cellint * np.exp(-self.tau_cumulative(trans, **kwargs))
         return np.where(np.isfinite(contrib), contrib, 0.0)
 
-    def cell_contribution(self, level, source='both', mincont=1e-10):
+    def cell_contribution(self, trans, **kwargs):
         """Normalised cell contribution to the observed emission."""
-        contrib = self.cell_emission(level, source=source)
+        contrib = self.cell_emission(trans, **kwargs)
         contrib = contrib / np.nansum(contrib, axis=0)
+        mincont = kwargs.get('mintcont', 1e-5)
         return np.where(contrib < mincont, mincont, contrib)
 
-    def _both_intensity(self, level):
+    def _both_intensity(self, trans, **kwargs):
         """Cell intensity [Jy/sr] for both line and dust emission."""
-        I = 1e23 * self.S_both(level) * (1. - np.exp(-self.tau_both(level)))
+        I = 1e23 * self.S_both(trans, **kwargs)
+        I *= (1. - np.exp(-self.tau_both(trans, **kwargs)))
         return np.where(np.isfinite(I), I, 0.0)
 
-    def _line_intensity(self, level):
+    def _line_intensity(self, trans, **kwargs):
         """Returns the cell intensity [Jy/sr] only considering the line."""
-        I = 1e23 * self.S_line(level) * (1. - np.exp(-self.tau_line(level)))
+        I = 1e23 * self.S_line(trans, **kwargs)
+        I *= (1. - np.exp(-self.tau_line(trans, **kwargs)))
         return np.where(np.isfinite(I), I, 0.0)
 
-    def _dust_intensity(self, level):
+    def _dust_intensity(self, trans, **kwargs):
         """Returns the cell intensity [Jy/sr] only considering the dust."""
-        I = 1e23 * self.S_dust(level) * (1. - np.exp(-self.tau_dust(level)))
+        I = 1e23 * self.S_dust(trans, **kwargs)
+        I *= (1. - np.exp(-self.tau_dust(trans, **kwargs)))
         return np.where(np.isfinite(I), I, 0.0)
         return
 
-    def alpha_line(self, level):
+    def alpha_line(self, trans, **kwargs):
         """Line absorption coefficient [/cm]."""
-        a = 1e4 * sc.c**2 / 8. / np.pi / self.rates.freq[level]**2
-        a *= self.rates.EinsteinA[level] * self.phi(level)
-        b = self.rates.g[level+1] / self.rates.g[level]
-        b *= self.levelpop(level)
-        b -= self.levelpop(level+1)
-        a *= b
+        nu = self.frequency(trans)
+        g_i, g_j = self.levelweights(trans)
+        n_i, n_j = self.leveldensities(trans)
+        A = self.EinsteinA(trans)
+        phi = self.phi(trans, **kwargs)
+        a = 1.25e3 * sc.c**2 * A * n_i * phi / np.pi / nu**2
+        a *= n_j * g_i / n_i / g_j - 1.
         return np.where(np.isfinite(a), a, 0.0)
 
-    def alpha_dust(self, level):
+    def alpha_dust(self, trans, **kwargs):
         """Dust absorption coefficient [/cm]."""
-        rho = self.gridded['dens'] / 1e6 / self.g2d
-        kappa = self.opacities(self.rates.freq[level])
-        alpha = rho * kappa
+        alpha = self.gridded['dens'] / 1e6 / self.g2d
+        alpha *= self.opacities(self.frequency(trans))
         return np.where(np.isfinite(alpha), alpha, 0.0)
 
-    def emiss_line(self, level):
+    def emiss_line(self, trans, **kwargs):
         """Line emissivity coefficient."""
-        return self.S_line(level) * self.alpha_line(level)
+        return self.S_line(trans) * self.alpha_line(trans)
 
-    def emiss_dust(self, level):
+    def emiss_dust(self, trans, **kwargs):
         """Dust emissivity coefficient."""
-        return self.S_dust(level) * self.alpha_dust(level)
+        return self.S_dust(trans) * self.alpha_dust(trans)
 
-    def S_dust(self, level):
+    def S_dust(self, trans, **kwargs):
         """Source function for the dust."""
-        nu = self.rates.freq[level]
+        nu = self.frequency(trans)
         B = 2. * sc.h * nu**3 / sc.c**2
         B /= np.exp(sc.h * nu / sc.k / self.gridded['dtemp']) - 1.
         return np.where(np.isfinite(B), B, 0.0)
 
-    def S_line(self, level):
+    def S_line(self, trans, **kwargs):
         """Source function for the line."""
-        s = 2. * sc.h * self.rates.freq[level]**3 / sc.c**2
-        ss = self.rates.g[level+1] / self.rates.g[level]
-        ss *= self.levelpop(level) / self.levelpop(level+1)
-        s /= (ss - 1.)
+        nu = self.frequency(trans)
+        g_i, g_j = self.levelweights(trans)
+        n_i, n_j = self.leveldensities(trans)
+        s = 2. * sc.h * nu**3 / sc.c**2 / (n_j * g_i / n_i / g_j - 1.)
         return np.where(np.isfinite(s), s, 0.0)
 
-    def S_both(self, level):
+    def S_both(self, trans, **kwargs):
         """Source function for both line and dust."""
-        source = self.alpha_dust(level) + self.alpha_line(level)
-        source /= self.emiss_dust(level) + self.emiss_line(level)
+        source = self.alpha_dust(trans) + self.alpha_line(trans)
+        source /= self.emiss_dust(trans) + self.emiss_line(trans)
         return np.where(np.isfinite(source), source, 0.0)
 
-    def tau_line(self, level):
+    def tau_line(self, trans, **kwargs):
         """Optical depth of the line emission for each cell."""
-        return self.alpha_line(level) * self.cellsize(self.ygrid)[:, None]
+        tau = self.alpha_line(trans, **kwargs)
+        return tau * self.cellsize(self.ygrid)[:, None]
 
-    def tau_dust(self, level):
+    def tau_dust(self, trans, **kwargs):
         """Optical depth of the dust emission for each cell."""
-        return self.alpha_dust(level) * self.cellsize(self.ygrid)[:, None]
+        tau = self.alpha_dust(trans, **kwargs)
+        return tau * self.cellsize(self.ygrid)[:, None]
 
-    def tau_both(self, level):
+    def tau_both(self, trans, **kwargs):
         """Total optical depth of each cell."""
-        return self.tau_line(level) + self.tau_dust(level)
+        tau = self.tau_line(trans, **kwargs)
+        return tau + self.tau_dust(trans)
 
-    def tau_cumulative(self, level, source='both'):
+    def tau_cumulative(self, trans, **kwargs):
         """Cumulative optical depth."""
+        source = kwargs.get('source', 'both')
         if source == 'line':
-            tau = self.tau_line(level)
+            tau = self.tau_line(trans, **kwargs)
         elif source == 'dust':
-            tau = self.tau_dust(level)
+            tau = self.tau_dust(trans, **kwargs)
         else:
-            tau = self.tau_both(level)
+            tau = self.tau_both(trans, **kwargs)
         return np.cumsum(tau[::-1], axis=0)[::-1]
 
-    def radial_intensity(self, level, pixscale=None):
+    def radial_intensity(self, trans, pixscale=None):
         """Radial intensity profile [Jy/sr]."""
-        I = np.nansum(self.cell_emission(level), axis=0)
+        I = np.nansum(self.cell_emission(trans), axis=0)
         return I
 
     def arcsec2sr(self, pixscale):
         """Convert a scale in arcseconds to a steradian."""
         return np.power(pixscale, 2.) * 2.35e-11
 
-    def phi(self, level, offset=0.0):
-        """Line fraction at line centre [/Hz]."""
-        dnu = self.linewidth * self.rates.freq[level] / sc.c
-        return 1. / dnu / np.sqrt(2. * np.pi)
+    def phi(self, trans, **kwargs):
+        """Line profile [/Hz]."""
+        wings = kwargs.get('wings', 0.0)
+        dnu = self.linewidth_freq(trans)
+        return np.exp(-wings) / dnu / np.sqrt(2. * np.pi)
 
     def normgauss(self, x, dx, x0=0.0):
         """Normalised Gaussian function."""
@@ -464,18 +469,18 @@ class outputgrid:
         else:
             raise ValueError("unit must be 'au' or 'cm'.")
 
-    def excitiationtemperature(self, level):
+    def excitiationtemperature(self, trans):
         """Two level excitation temperature [K]."""
-        T = self.levelpop(level) * self.rates.g[level+1]
-        T /= self.levelpop(level+1) * self.rates.g[level]
-        T = sc.h * self.rates.freq[level] / sc.k / np.log(T)
+        n_i, n_j = self.leveldensities(trans)
+        g_i, g_j = self.levelweights(trans)
+        nu = self.frequency(trans)
+        T = sc.h * nu / sc.k / np.log(n_j * g_i / n_i / g_j)
         return np.where(np.isfinite(T), T, 0.0)
 
-    def emissionlayer(self, level, **kwargs):
+    def emissionlayer(self, trans, **kwargs):
         """Percentiles for the dominant emission layer [au]."""
-        s = kwargs.get('source', 'both')
-        f = self.cell_contribution(level, source=s)
-        p = np.array([self.wpercentiles(self.ygrid, f[:, i])
+        f = self.cell_contribution(trans, **kwargs)
+        p = np.array([self.wpercentiles(abs(self.ygrid), f[:, i])
                       for i in xrange(self.xgrid.size)])
         if kwargs.get('percentiles', False):
             return p.T
@@ -484,7 +489,7 @@ class outputgrid:
     def molecularlayer(self, **kwargs):
         """Percentiles for the dominant emission layer [au]."""
         f = self.gridded['abun'] * self.gridded['dens']
-        p = np.array([self.wpercentiles(self.ygrid, f[:, i])
+        p = np.array([self.wpercentiles(abs(self.ygrid), f[:, i])
                       for i in xrange(self.xgrid.size)])
         if kwargs.get('percentiles', False):
             return p.T
@@ -507,9 +512,27 @@ class outputgrid:
             return p.T
         return self.percentilestoerrors(p.T)
 
-    # -- Static Methods --
-    #
-    # Simple functions to aid with the calculations.
+    def energylevels(self, trans):
+        """Returns the upper and lower energy levels of the transition."""
+        return self.rates.lines[trans].i, self.rates.lines[trans].j
+
+    def levelweights(self, trans):
+        """Returns the weights of the energy levels of the transition."""
+        level_i, level_j = self.energylevels(trans)
+        return self.rates.levels[level_i].g, self.rates.levels[level_j].g
+
+    def leveldensities(self, trans):
+        """Returns the number densities of the two energy levels [/ccm]."""
+        level_i, level_j = self.energylevels(trans)
+        return self.levelpop(level_i), self.levelpop(level_j)
+
+    def frequency(self, trans, **kwargs):
+        """Returns the frequency [Hz] of the transition."""
+        return self.rates.lines[trans].freq
+
+    def EinsteinA(self, trans):
+        """Returns the Einstein A coefficient [Hz] of the transition."""
+        return self.rates.lines[trans].A
 
     @staticmethod
     def wpercentiles(data, weights, percentiles=[0.16, 0.5, 0.84], **kwargs):
