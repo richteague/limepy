@@ -561,7 +561,7 @@ class outputgrid:
 
     @staticmethod
     def percentilestoerrors(percentiles):
-        """Converts [16,50,84] percentiles to <x> +/- dx."""
+        """Converts [16, 50, 84] percentiles to [<x>, -dx, +dx]."""
         profile = np.ones(percentiles.shape)
         profile[0] = percentiles[1]
         profile[1] = percentiles[1] - percentiles[0]
