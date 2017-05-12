@@ -45,7 +45,7 @@ Functions to do:
 
 import os
 from headerclass import readheader
-from limepy.analysis.collisionalrates import readrates
+from limepy.analysis.collisionalrates import ratefile
 import numpy as np
 
 
@@ -54,7 +54,7 @@ class model:
     def __init__(self, header, rates, dust='jena_thin_e6.tab', **kwargs):
 
         self.path = os.path.dirname(__file__)
-        self.aux = self.path + '../aux/'
+        self.aux = self.path.replace('model', 'aux/')
         self.directory = kwargs.get('directory', '../')
 
         # Check whether the required files are there. If so, move them.
@@ -69,7 +69,7 @@ class model:
         os.system('cp %s%s .' % (self.aux, rates))
         os.system('cp %s%s .' % (self.aux, dust))
         self.header = readheader(header)
-        self.rates = readrates(rates)
+        self.rates = ratefile(rates)
         self.moldatfile = rates
         self.dust = dust
 
@@ -139,7 +139,7 @@ class model:
 
         # Model parameters. These should affect the running of the model.
 
-        self.pIntensity = float(kwargs.get('pIntensity', 1e5))
+        self.pIntensity = float(kwargs.get('pIntensity', 1e4))
         self.sinkPoints = float(kwargs.get('sinkPoints', 3e3))
         if self.sinkPoints > self.pIntensity:
             print("Warning: sinkPoints > pIntensity.")
@@ -162,7 +162,7 @@ class model:
         self.blend = int(kwargs.get('blend', 0))
         if self.blend > 1:
             raise ValueError('blend must be 0 or 1.')
-        elif self.blend == 0:
+        elif self.blend == 1:
             print 'Including line blending. Will be slow.'
 
         self.traceRayAlgorithm = int(kwargs.get('traceRayAlgorithm', 0))
@@ -181,10 +181,10 @@ class model:
         self.pxls = int(kwargs.get('pxls', 128))
         self.distance = float(kwargs.get('distance', 1.))
         self.source_vel = kwargs.get('source_vel', 0.0)
-        self.imgres = float(kwargs.get('imgres', None))
-        if self.imgres is None:
+        self.imgres = float(kwargs.get('imgres', 0))
+        if self.imgres == 0.0:
             self.imgres = 2. * self.radius / self.distance / self.pxls
-        self.unit = int(kwargs.get('unit', 1))
+        self.unit = int(kwargs.get('unit', 0))
         if self.unit not in [0, 1, 2, 3]:
             raise ValueError('unit must be 0, 1, 2 or 3.')
 
@@ -193,7 +193,7 @@ class model:
         if '.' in self.name:
             self.name = ''.join(self.name.split('.')[:-1])
 
-        self.transitions = kwargs.get('transitions', [0.])
+        self.transitions = kwargs.get('transitions', [0])
         self.transitions = checkiterable(self.transitions)
         self.ntra = len(self.transitions)
 
@@ -207,7 +207,7 @@ class model:
 
         self.azimuth = kwargs.get('azimuth', [0.])
         self.azimuth = checkiterable(self.azimuth)
-        self.nazi = len(self.aximuth)
+        self.nazi = len(self.azimuth)
 
         # Additional variables.
 
@@ -218,15 +218,13 @@ class model:
             raise ValueError()
         self.rescaletemp = kwargs.get('rescaletemp', False)
         self.depletion = float(kwargs.get('depletion', False))
-        self.oversample = int(kwargs.get('oversample', False))
+        self.oversample = int(kwargs.get('oversample', 1))
         self.niceness = kwargs.get('niceness', False)
         self.waittime = kwargs.get('wait', 60.)
 
         # Additional variables to be updated.
 
-        self.tcmb = kwargs.get('tcmb', None)
-        if self.tcmb is not None:
-            raise NotImplementedError()
+        self.tcmb = kwargs.get('tcmb', 2.73)
 
         self.molI = kwargs.get('molI', None)
         if self.molI is not None:

@@ -12,7 +12,7 @@ from astropy.io import fits
 
 def filename(prefix, i, p, a, t):
     """Returns the filename"""
-    return '{}_{:.2f}_{:.2f}_{:.2f}_{}.fits'.format(prefix, i, p, a, t)
+    return '{}_{:.2f}_{:.2f}_{:.2f}_{:d}.fits'.format(prefix, i, p, a, t)
 
 
 def moveFiles(model, prefix='0_', suffix='.fits'):
@@ -51,7 +51,10 @@ def writeFitsHeader(filename, model, inc, pa, azi):
     header['AZI'] = azi, 'Azimuthal angle in radians.'
     header['NMODELS'] = model.nmodels, 'Number of models averaged.'
     header['OPR'] = model.opr, 'Ortho-para ratio of H2.'
-    fits.writeto(filename, data, header, overwrite=True)
+    try:
+        fits.writeto(filename, data, header, overwrite=True)
+    except TypeError:
+        fits.writeto(filename, data, header, clobber=True)
     return
 
 

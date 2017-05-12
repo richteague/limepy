@@ -53,7 +53,8 @@ class ratefile:
         # Initially search for the molecule in the aux directory.
         # If not there, assume it is a direct path.
 
-        self.aux = '/Users/richardteague/PythonPackages/limepy/aux/'
+	self.path = os.path.dirname(__file__)
+	self.aux = self.path.replace('analysis', 'aux/')
         rates = '%s.dat' % molecule.lower()
         if rates in os.listdir(self.aux):
             fn = self.aux+rates

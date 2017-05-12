@@ -113,7 +113,7 @@ def writeFindValue(temp, model):
     """Include the interpolation functions for array inputs."""
     if not (model.coordsys is 'cylindrical' and model.ndim is 2):
         raise NotImplementedError
-    path = os.path.dirname(__file__)+'../interpolation/'
+    path = os.path.dirname(__file__).replace('model', 'interpolation/')
     with open(path+'%dD_%s.c' % (model.ndim, model.coordsys)) as f:
         lines = f.readlines()
     for line in lines:
@@ -145,15 +145,15 @@ def writeTemperatures(temp, model):
     temp.append('\ttemperature[0] = findvalue(c1, c2, c3, temp);\n')
     if model.rescaletemp:
         temp.append('\ttemperature[0] *= %.3f;\n' % model.rescaletemp)
-    temp.append('\tif (temperature[0] < 0.0) ')
-    temp.append('{\n\t\ttemperature[0] = 0.0;\n\t}\n\n')
+    temp.append('\tif (temperature[0] < %.2f) ' % model.tcmb)
+    temp.append('{\n\t\ttemperature[0] = %.2f;\n\t}\n\n' % model.tcmb)
     if type(model.dtemp) is float:
         temp.append('\ttemperature[1] = %.3f * temperature[0];' % model.dtemp)
         temp.append('\n\n')
     else:
         temp.append('\ttemperature[1] = findvalue(c1, c2, c3, dtemp);\n')
-        temp.append('\tif (temperature[1] < 0.0) ')
-        temp.append('{\n\t\ttemperature[1] = 0.0;\n\t}\n')
+        temp.append('\tif (temperature[1] < %.2f) ' % model.tcmb)
+        temp.append('{\n\t\ttemperature[1] = %.2f;\n\t}\n' % model.tcmb)
     temp.append('}\n\n\n')
     return
 
@@ -166,7 +166,7 @@ def writeAbundance(temp, model):
         temp.append('\tabundance[0] = %.3e;\n' * model.abund)
     else:
         writeCoords(temp, model)
-        temp.append('\tfindvalue(c1, c2, c3, abund);\n' % model.abund)
+        temp.append('\tabundance[0] = findvalue(c1, c2, c3, abund);\n' % model.abund)
     if model.depletion:
         temp.append('\tabundance[0] *= %.3e;\n' % model.depletion)
     temp.append('\tif (abundance[0] < 0.){\n\t\tabundance[0] = 0.;\n\t}\n')
