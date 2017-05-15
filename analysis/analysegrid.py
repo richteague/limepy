@@ -36,6 +36,8 @@ class outputgrid:
         self.aux = self.aux.replace('analysis', 'aux/')
         self.hdu = fits.open(self.path)
         self.verbose = kwargs.get('verbose', True)
+        self.depletion = kwargs.get('depletion', 1.0)
+
         if not self.verbose:
             warnings.simplefilter("ignore")
 
@@ -280,7 +282,7 @@ class outputgrid:
         if level not in self.gridded['levels'].keys():
             self.grid_levels(level+1)
         nmol = self.gridded['dens'] * self.gridded['abun'] / 1e6
-        return nmol * self.gridded['levels'][level]
+        return nmol * self.gridded['levels'][level] * self.depletion
 
     # -- Contribution Functions --
     #
@@ -504,8 +506,8 @@ class outputgrid:
 
     def opticaldepth(self, level, **kwargs):
         """Flux weighted optical depth."""
-        v = np.cumsum(self.tau(level)[::-1], axis=0)[::-1]
-        f = self.cell_contribution(level)
+        v = self.tau_cumulative(level, **kwargs)
+        f = self.cell_contribution(level, **kwargs)
         p = np.array([self.wpercentiles(v[:, i], f[:, i])
                       for i in xrange(self.xgrid.size)])
         if kwargs.get('percentiles', False):
@@ -561,7 +563,7 @@ class outputgrid:
 
     @staticmethod
     def percentilestoerrors(percentiles):
-        """Converts [16,50,84] percentiles to <x> +/- dx."""
+        """Converts [16, 50, 84] percentiles to [<x>, -dx, +dx]."""
         profile = np.ones(percentiles.shape)
         profile[0] = percentiles[1]
         profile[1] = percentiles[1] - percentiles[0]
