@@ -9,7 +9,8 @@ Functions to do:
     > Unit conversion to K.
     > Include velocity structure.
     > Tidy up the masking.
-    > Include dust opacity.
+    > Allow for a gas to dust function to be included rather than taking a
+      disk-wide value, e.g. the default 100.
 
 """
 
@@ -102,7 +103,7 @@ class outputgrid:
         self.turb = self.grid.data['TURBDPLR'][self.notsink]
 
         # Mask out all points with a total density of <= min_density, with a
-        # default of 10^4.
+        # default of 10^4. Include the depletion of the emitting molecule.
 
         self.dmask = self.dens > kwargs.get('min_density', 1e4)
         self.xvals = self.xvals[self.dmask]
@@ -114,7 +115,7 @@ class outputgrid:
         self.gtemp = self.gtemp[self.dmask]
         self.dtemp = self.dtemp[self.dmask]
         self.dens = self.dens[self.dmask]
-        self.abun = self.abun[self.dmask]
+        self.abun = self.abun[self.dmask] * self.depletion
         self.turb = self.turb[self.dmask]
 
         # Excitation properties. Remove all the sink particles.
@@ -182,7 +183,7 @@ class outputgrid:
             raise ValueError("Can't read in dust opacities.")
         self.opacities = interp1d(sc.c * 1e6 / self.opacities[0][::-1],
                                   self.opacities[1][::-1], bounds_error=False,
-                                  fill_value="extrapolated")
+                                  fill_value="extrapolate")
         self.g2d = kwargs.get('g2d', 100.)
         if self.verbose:
             print('Successfully attached dust opacities. Values loaded for')
@@ -282,7 +283,7 @@ class outputgrid:
         if level not in self.gridded['levels'].keys():
             self.grid_levels(level+1)
         nmol = self.gridded['dens'] * self.gridded['abun'] / 1e6
-        return nmol * self.gridded['levels'][level] * self.depletion
+        return nmol * self.gridded['levels'][level]
 
     # -- Contribution Functions --
     #
@@ -347,7 +348,8 @@ class outputgrid:
 
     def alpha_dust(self, trans, **kwargs):
         """Dust absorption coefficient [/cm]."""
-        alpha = self.gridded['dens'] / 1e6 / self.g2d
+        g2d = kwargs.get('g2d', self.g2d)
+        alpha = self.gridded['dens'] * sc.m_p / 1e6 / g2d
         alpha *= self.opacities(self.frequency(trans))
         return np.where(np.isfinite(alpha), alpha, 0.0)
 
@@ -374,10 +376,16 @@ class outputgrid:
         s = 2. * sc.h * nu**3 / sc.c**2 / (n_j * g_i / n_i / g_j - 1.)
         return np.where(np.isfinite(s), s, 0.0)
 
-    def S_both(self, trans, **kwargs):
+    def S_both_old(self, trans, **kwargs):
         """Source function for both line and dust."""
         source = self.alpha_dust(trans) + self.alpha_line(trans)
         source /= self.emiss_dust(trans) + self.emiss_line(trans)
+        return np.where(np.isfinite(source), source, 0.0)
+
+    def S_both(self, trans, **kwargs):
+        """Source function for both line and dust."""
+        source = self.emiss_dust(trans) + self.emiss_line(trans)
+        source /= self.alpha_dust(trans) + self.alpha_line(trans)
         return np.where(np.isfinite(source), source, 0.0)
 
     def tau_line(self, trans, **kwargs):
@@ -393,7 +401,7 @@ class outputgrid:
     def tau_both(self, trans, **kwargs):
         """Total optical depth of each cell."""
         tau = self.tau_line(trans, **kwargs)
-        return tau + self.tau_dust(trans)
+        return tau + self.tau_dust(trans, **kwargs)
 
     def tau_cumulative(self, trans, **kwargs):
         """Cumulative optical depth."""

@@ -53,8 +53,8 @@ class ratefile:
         # Initially search for the molecule in the aux directory.
         # If not there, assume it is a direct path.
 
-	self.path = os.path.dirname(__file__)
-	self.aux = self.path.replace('analysis', 'aux/')
+        self.path = os.path.dirname(__file__)
+        self.aux = self.path.replace('analysis', 'aux/')
         rates = '%s.dat' % molecule.lower()
         if rates in os.listdir(self.aux):
             fn = self.aux+rates
@@ -139,6 +139,7 @@ class ratefile:
         self.rates[ID] = crates(trans, temps, tup, tlo, rates)
         self.rates[coll_ID[ID]] = self.rates[ID]
         return
+
 
 coll_ID = {}
 names = ['H2', 'pH2', 'oH2', 'e', 'H', 'He', 'Hplus']

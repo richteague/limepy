@@ -15,6 +15,7 @@ Functions to do:
 import numpy as np
 from astropy.io import fits
 import scipy.constants as sc
+from scipy.interpolate import interp1d
 
 
 class cube:
@@ -49,6 +50,7 @@ class cube:
 
         self.inc, self.pa, self.dist, self.azi = self.readheader(**kwargs)
         self.projax = self.posax * self.dist
+        self.mstar = self.readvalue('mstar', fillval=1.0)
 
         # If the trio of (inc, pa, azi) are all defined, then we can calculate
         # the projected positions of each pixel assuming a thin disk.
@@ -94,6 +96,42 @@ class cube:
         x_dep = x_rot
         y_dep = y_rot / np.cos(self.inc)
         return np.hypot(y_dep, x_dep), np.arctan2(y_dep, x_dep)
+
+    def keplerian(self, **kwargs):
+        """Projected Keplerian velocity at the given pixel."""
+        mstar = kwargs.get('mstar', self.mstar)
+        keplerian = np.sqrt(sc.G * mstar * 1.989e30 / self.rvals / sc.au)
+        return keplerian * np.sin(self.inc) * np.cos(self.tvals)
+
+    def averagespectra(self, bins=None, nbins=None, **kwargs):
+        """Azimuthally average spectra."""
+        shifted = self.shiftspectra(**kwargs)
+        shifted = shifted.reshape((shifted.shape[0], -1)).T
+        bins = self.radialbins(bins=bins, nbins=nbins)
+        ridxs = np.digitize(self.rvals.ravel(), bins)
+        rpnts = np.mean([bins[1:], bins[:-1]], axis=0)
+        lines = [np.average(shifted[ridxs == r], axis=0)
+                 for r in range(1, bins.size)]
+        scatter = [np.std(shifted[ridxs == r], axis=0)
+                   for r in range(1, bins.size)]
+        return rpnts, np.squeeze(lines), np.squeeze(scatter)
+
+    def shiftspectra(self, **kwargs):
+        """Shift all pixels by the Keplerian offset."""
+        if self.inc == 0.0:
+            return self.line
+        shifted = np.zeros(self.line.shape)
+        offset = self.keplerian(**kwargs)
+        rout = kwargs.get('rout', 2.0)
+        for i in range(self.posax.size):
+            for j in range(self.posax.size):
+                if self.rvals > rout:
+                    continue
+                shift = interp1d(self.velax - offset[j, i], self.line[:, j, i],
+                                 fill_value=0.0, bounds_error=False,
+                                 assume_sorted=True)
+                shifted[:, j, i] = shift(self.velax)
+        return shifted
 
     def zerothmoment(self, **kwargs):
         """Returns the zeroth moment of the data."""
@@ -147,7 +185,7 @@ class cube:
         bins = self.radialbins(bins=bins, nbins=nbins)
         zeroth = self.zerothmoment(**kwargs).ravel()
         ridxs = np.digitize(self.rvals.ravel(), bins)
-        pvals = kwargs.get('percentiles', [0.16, 0.5, 0.94])
+        pvals = kwargs.get('percentiles', [0.16, 0.5, 0.84])
         rpnts = np.mean([bins[1:], bins[:-1]], axis=0)
         percentiles = [np.percentile(zeroth[ridxs == r], pvals)
                        for r in range(1, bins.size)]
@@ -226,19 +264,11 @@ class cube:
         return inc, pa, dist, azi
 
     def readbeam(self, **kwargs):
-        """Reads in the beam properties."""
-        bmin = self.readvalue('bmin', **kwargs)
-        bmaj = self.readvalue('bmaj', **kwargs)
-        bpa = self.readvalue('bpa', **kwargs)
-        if np.isnan(bmin):
-            bmin = self.dpix
-        else:
-            bmin = np.radians(bmin)
-        if np.isnan(bmaj):
-            bmaj = self.dpix
-        else:
-            bmaj = np.radians(bmaj)
-        return bmin, bmaj, np.radians(bpa)
+        """Reads in the beam properties [rad]."""
+        bmin = self.readvalue('bmin', fillval=self.dpix/3600., **kwargs)
+        bmaj = self.readvalue('bmaj', fillval=self.dpix/3600., **kwargs)
+        bpa = self.readvalue('bpa', fillval=0.0, **kwargs)
+        return np.radians(bmin), np.radians(bmaj), np.radians(bpa)
 
     def readvalue(self, key, fillval=np.nan, **kwargs):
         """Attempt to read a value from the header."""
