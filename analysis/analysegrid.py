@@ -247,10 +247,12 @@ class outputgrid:
     # Simple physical properties of the disk. These should be equal to what the
     # input values were for the LIME modelling.
 
-    @property
-    def columndensity(self):
+    def columndensity(self, trans=None):
         """Returns the column density of the emitting molecule."""
-        nmol = self.gridded['dens'] * self.gridded['abun'] / 1e6
+        if trans is None:
+            nmol = self.gridded['dens'] * self.gridded['abun'] / 1e6
+        else:
+            nmol = self.levelpop(trans)
         if self.ygrid.min() < 0:
             return np.trapz(nmol, x=self.ygrid*sc.au*1e2, axis=0)
         return 2. * np.trapz(nmol, x=self.ygrid*sc.au*1e2, axis=0)
@@ -460,6 +462,7 @@ class outputgrid:
         if param not in self.gridded.keys():
             raise ValueError('Not valid parameter.')
         f = self.gridded['abun'] * self.gridded['dens']
+        f *= self.cellsize(self.ygrid)
         v = self.gridded[param]
         p = np.array([self.wpercentiles(v[:, i], f[:, i])
                       for i in xrange(self.xgrid.size)])
@@ -499,6 +502,7 @@ class outputgrid:
     def molecularlayer(self, **kwargs):
         """Percentiles for the dominant emission layer [au]."""
         f = self.gridded['abun'] * self.gridded['dens']
+        f *= self.cellsize(self.ygrid)
         p = np.array([self.wpercentiles(abs(self.ygrid), f[:, i])
                       for i in xrange(self.xgrid.size)])
         if kwargs.get('percentiles', False):
