@@ -42,7 +42,8 @@ def writeModelProperties(temp, model):
     temp.append('\tpar->sinkPoints = %.d;\n' % model.sinkPoints)
     temp.append('\tpar->sampling = %d;\n' % model.sampling)
     temp.append('\tpar->moldatfile[0] = "%s";\n' % model.moldatfile)
-    temp.append('\tpar->dust = "%s";\n' % model.dust)
+    if model.dust is not None:
+        temp.append('\tpar->dust = "%s";\n' % model.dust)
     temp.append('\tpar->lte_only = %d;\n' % model.lte_only)
     temp.append('\tpar->blend = %d;\n' % model.blend)
     temp.append('\tpar->antialias = %d;\n' % model.antialias)

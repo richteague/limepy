@@ -63,11 +63,12 @@ class model:
             raise ValueError('No header file found.')
         if not os.path.isfile(self.aux+rates):
             raise ValueError('No collisional rates found.')
-        if not os.path.isfile(self.aux+dust):
-            raise ValueError('No dust opacities found.')
+        if dust is not None:
+            if not os.path.isfile(self.aux+dust):
+                raise ValueError('No dust opacities found.')
+            os.system('cp %s%s .' % (self.aux, dust))
         os.system('cp ../%s .' % header)
         os.system('cp %s%s .' % (self.aux, rates))
-        os.system('cp %s%s .' % (self.aux, dust))
         self.header = readheader(header)
         self.rates = ratefile(rates)
         self.moldatfile = rates
@@ -151,7 +152,10 @@ class model:
         if self.sampling not in [0, 1, 2]:
             raise ValueError('sampling must be 0, 1 or 2.')
 
-        self.gridOutFile = bool(kwargs.get('gridOutFile', False))
+        # The gridOutFile must be boolean.
+        self.gridOutFile = kwargs.get('gridOutFile', False)
+        if type(self.gridOutFile) is not bool:
+            raise TypeError('gridOutFile must be True / False.')
 
         self.lte_only = int(kwargs.get('lte_only', 1))
         if self.lte_only > 1:
