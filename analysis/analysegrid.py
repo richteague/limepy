@@ -196,8 +196,7 @@ class outputgrid:
 
     def grid_levels(self, nlevels):
         """Grid the specified energy levels."""
-        for jj in np.arange(nlevels):
-            j = jj + 1
+        for j in np.arange(nlevels):
             if j in self.gridded['levels'].keys():
                 continue
             self.gridded['levels'][j] = self.grid_param(self.levels[j],
@@ -339,13 +338,13 @@ class outputgrid:
 
     def alpha_line(self, trans, **kwargs):
         """Line absorption coefficient [/cm]."""
+        n_u, n_l = self.leveldensities(trans)
+        g_u, g_l = self.levelweights(trans)
         nu = self.frequency(trans)
-        g_i, g_j = self.levelweights(trans)
-        n_i, n_j = self.leveldensities(trans)
         A = self.EinsteinA(trans)
         phi = self.phi(trans, **kwargs)
-        a = 1.25e3 * sc.c**2 * A * n_i * phi / np.pi / nu**2
-        a *= n_j * g_i / n_i / g_j - 1.
+        a = 1.25e3 * sc.c**2 * A * n_u * phi / np.pi / nu**2
+        a *= (n_l * g_u / n_u / g_l) - 1.
         return np.where(np.isfinite(a), a, 0.0)
 
     def alpha_dust(self, trans, **kwargs):
@@ -372,10 +371,10 @@ class outputgrid:
 
     def S_line(self, trans, **kwargs):
         """Source function for the line."""
+        n_u, n_l = self.leveldensities(trans)
+        g_u, g_l = self.levelweights(trans)
         nu = self.frequency(trans)
-        g_i, g_j = self.levelweights(trans)
-        n_i, n_j = self.leveldensities(trans)
-        s = 2. * sc.h * nu**3 / sc.c**2 / (n_j * g_i / n_i / g_j - 1.)
+        s = 2. * sc.h * nu**3 / sc.c**2 / (n_l * g_u / n_u / g_l - 1.)
         return np.where(np.isfinite(s), s, 0.0)
 
     def S_both_old(self, trans, **kwargs):
@@ -433,8 +432,8 @@ class outputgrid:
 
     def normgauss(self, x, dx, x0=0.0):
         """Normalised Gaussian function."""
-        func = np.exp(-0.5 * np.power((x-x0) / dx, 2.))
-        func /= dx * np.sqrt(2. * np.pi)
+        func = np.exp(-1.0 * np.power((x-x0) / dx, 2.))
+        func /= dx * np.sqrt(np.pi)
         return np.where(np.isfinite(func), func, 0.0)
 
     # -- Weighted Properties --
@@ -484,10 +483,10 @@ class outputgrid:
 
     def excitiationtemperature(self, trans):
         """Two level excitation temperature [K]."""
-        n_i, n_j = self.leveldensities(trans)
-        g_i, g_j = self.levelweights(trans)
+        n_u, n_l = self.leveldensities(trans)
+        g_u, g_l = self.levelweights(trans)
         nu = self.frequency(trans)
-        T = sc.h * nu / sc.k / np.log(n_j * g_i / n_i / g_j)
+        T = sc.h * nu / sc.k / np.log(n_l * g_u / n_u / g_l)
         return np.where(np.isfinite(T), T, 0.0)
 
     def emissionlayer(self, trans, **kwargs):
@@ -526,27 +525,21 @@ class outputgrid:
             return p.T
         return self.percentilestoerrors(p.T)
 
-    def energylevels(self, trans):
-        """Returns the upper and lower energy levels of the transition."""
-        return self.rates.lines[trans].i, self.rates.lines[trans].j
-
     def levelweights(self, trans):
-        """Returns the weights of the energy levels of the transition."""
-        level_i, level_j = self.energylevels(trans)
-        return self.rates.levels[level_i].g, self.rates.levels[level_j].g
+        """Weights of the upper / lower energy levels of the transition."""
+        return self.rates.levels[trans+2].g, self.rates.levels[trans+1].g
 
     def leveldensities(self, trans):
-        """Returns the number densities of the two energy levels [/ccm]."""
-        level_i, level_j = self.energylevels(trans)
-        return self.levelpop(level_i), self.levelpop(level_j)
+        """Returns the upper / lower energy number densities [/ccm]."""
+        return self.levelpop(trans+1), self.levelpop(trans)
 
     def frequency(self, trans, **kwargs):
         """Returns the frequency [Hz] of the transition."""
-        return self.rates.lines[trans].freq
+        return self.rates.lines[trans+1].freq
 
     def EinsteinA(self, trans):
         """Returns the Einstein A coefficient [Hz] of the transition."""
-        return self.rates.lines[trans].A
+        return self.rates.lines[trans+1].A
 
     @staticmethod
     def wpercentiles(data, weights, percentiles=[0.16, 0.5, 0.84], **kwargs):
