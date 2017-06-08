@@ -36,7 +36,10 @@ def averageModels(model):
                                for m in range(model.nmodels)]
                         getNoise(avg, i, p, a, t, model)
                         hdu[0].data = np.average(avg, axis=0)
-                        hdu.writeto(fn, overwrite=True)
+                        try:
+                            hdu.writeto(fn, overwrite=True)
+                        except TypeError:
+                            hdu.writeto(fn, clobber=True)
                     writeFitsHeader(fn, model, i, p, a)
     return
 
@@ -51,6 +54,7 @@ def writeFitsHeader(filename, model, inc, pa, azi):
     header['AZI'] = azi, 'Azimuthal angle in radians.'
     header['NMODELS'] = model.nmodels, 'Number of models averaged.'
     header['OPR'] = model.opr, 'Ortho-para ratio of H2.'
+    header['MSTAR'] = model.mstar, 'Mass of central star in Msun.'
     try:
         fits.writeto(filename, data, header, overwrite=True)
     except TypeError:
