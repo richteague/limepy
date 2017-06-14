@@ -179,20 +179,22 @@ double interpolation(double c1, double c2, int aidx, int bidx, int cidx,
     }
 }
 
-double findvalue(double c1, double c2, double c3, const double arr[NCELLS]){
+double findvalue(double x, double y, double z, const double arr[NCELLS]){
 
     /*
-        Returns the interpolated value of (c1, c2). If interpolation is not
+        Returns the interpolated value of (rad, alt). If interpolation is not
         possible then returns -1. This should be caught in the phyiscal
         properties function.
     */
 
-    double value;
+    double rad = sqrt(x*x + y*y) / AU;
+    double alt = fabs(z) / AU;
+    double azi = atan2(y, x);
     int aidx, bidx, cidx, didx;
-    findcell(c1, c2, &aidx, &bidx, &cidx, &didx);
+
+    findcell(rad, alt, &aidx, &bidx, &cidx, &didx);
     if (aidx >= 0) {
-        value = interpolation(c1, c2, aidx, bidx, cidx, didx, arr);
-        return value;
+        return interpolation(c1, c2, aidx, bidx, cidx, didx, arr);
     } else {
         return -1.;
     }
