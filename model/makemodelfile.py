@@ -20,7 +20,7 @@ def makeFile(m, model):
     writeModelProperties(tempfile, model)
     writeWeighting(tempfile, model)
     writeImageParameters(tempfile, m, model)
-    writeFindValue(tempfile, model)
+    writeInterpolationFuncs(tempfile, model)
     writeDensity(tempfile, model)
     writeTemperatures(tempfile, model)
     writeAbundance(tempfile, model)
@@ -98,9 +98,11 @@ def writeImageBlock(temp, nimg, m, inc, pa, azi, trans, model):
     return
 
 
+'''
 def writeCoords(temp, model):
+    raise NotImplementedError
     """Define the model coordinates for each function."""
-    if not (model.coordsys is 'cylindrical' and model.ndim is 2):
+    if model.coordsys is not 'cylindrical':
         raise NotImplementedError
     if model.coordsys is 'cylindrical':
         if model.ndim is 2:
@@ -108,17 +110,18 @@ def writeCoords(temp, model):
             temp.append('\tdouble c2 = fabs(z) / AU;\n')
             temp.append('\tdouble c3 = -1.;\n')
     return
+'''
 
 
-def writeFindValue(temp, model):
+def writeInterpolationFuncs(temp, model):
     """Include the interpolation functions for array inputs."""
-    if not (model.coordsys is 'cylindrical' and model.ndim is 2):
-        raise NotImplementedError
     path = os.path.dirname(__file__).replace('model', 'interpolation/')
     with open(path+'%dD_%s.c' % (model.ndim, model.coordsys)) as f:
         lines = f.readlines()
     for line in lines:
         line = line.replace('NCELLS', '%d' % model.ncells)
+        if model.ndim == 3:
+            line = line.replace('NTHETA', '%d' % model.ntheta)
         temp.append(line)
     temp.append('\n\n')
     return
@@ -128,10 +131,10 @@ def writeDensity(temp, model):
     """Main collider densities."""
     temp.append('void density(double x, double y,')
     temp.append('double z, double *density) {\n\n')
-    writeCoords(temp, model)
+    # writeCoords(temp, model)
     for i, val in enumerate(model.rescaledens):
         temp.append('\tdensity[%d] = %.2f *' % (i, val))
-        temp.append(' findvalue(c1, c2, c3, dens);\n')
+        temp.append(' findvalue(x, y, z, dens);\n')
         temp.append('\tif (density[%d] < 1e3)' % i)
         temp.append(' {\n\t\tdensity[%d] = 1e3;\n\t}\n\n' % i)
     temp.append('}\n\n\n')
@@ -142,8 +145,8 @@ def writeTemperatures(temp, model):
     """Gas and dust temperatures."""
     temp.append('void temperature(double x, double y, double z,')
     temp.append('double *temperature) {\n\n')
-    writeCoords(temp, model)
-    temp.append('\ttemperature[0] = findvalue(c1, c2, c3, temp);\n')
+    # writeCoords(temp, model)
+    temp.append('\ttemperature[0] = findvalue(x, y, z, temp);\n')
     if model.rescaletemp:
         temp.append('\ttemperature[0] *= %.3f;\n' % model.rescaletemp)
     temp.append('\tif (temperature[0] < %.2f) ' % model.tcmb)
@@ -152,7 +155,7 @@ def writeTemperatures(temp, model):
         temp.append('\ttemperature[1] = %.3f * temperature[0];' % model.dtemp)
         temp.append('\n\n')
     else:
-        temp.append('\ttemperature[1] = findvalue(c1, c2, c3, dtemp);\n')
+        temp.append('\ttemperature[1] = findvalue(x, y, z, dtemp);\n')
         temp.append('\tif (temperature[1] < %.2f) ' % model.tcmb)
         temp.append('{\n\t\ttemperature[1] = %.2f;\n\t}\n' % model.tcmb)
     temp.append('}\n\n\n')
@@ -166,8 +169,9 @@ def writeAbundance(temp, model):
     if type(model.abund) is float:
         temp.append('\tabundance[0] = %.3e;\n' * model.abund)
     else:
-        writeCoords(temp, model)
-        temp.append('\tabundance[0] = findvalue(c1, c2, c3, abund);\n' % model.abund)
+        # writeCoords(temp, model)
+        temp.append('\tabundance[0] = ')
+        temp.append('findvalue(x, y, z, abund);\n' % model.abund)
     if model.depletion:
         temp.append('\tabundance[0] *= %.3e;\n' % model.depletion)
     temp.append('\tif (abundance[0] < 0.){\n\t\tabundance[0] = 0.;\n\t}\n')
@@ -182,8 +186,8 @@ def writeDoppler(temp, model):
     if type(model.turb) is float:
         temp.append('\t*doppler = %.3e;\n' % model.turb)
     else:
-        writeCoords(temp, model)
-        temp.append('\t*doppler = findvalue(c1, c2, c3, turb);\n')
+        # writeCoords(temp, model)
+        temp.append('\t*doppler = findvalue(x, y, z, turb);\n')
     if model.turbtype == 'mach':
         temp.append('\tdouble val[2];\n')
         temp.append('\ttemperature(x, y, z, &val);\n')
@@ -199,8 +203,8 @@ def writeGastoDust(temp, model, ming2d=1.):
     if type(model.g2d) is float:
         temp.append('\t*gtd = %.1f;\n\n' % model.g2d)
     else:
-        writeCoords(temp, model)
-        temp.append('\t*gtd = findvalue(c1, c2, c3, g2d);\n\n')
+        # writeCoords(temp, model)
+        temp.append('\t*gtd = findvalue(x, y, z, g2d);\n\n')
     temp.append('\tif (*gtd < 1e-4) {\n\t\t*gtd = 1e-4;\n\t}\n}\n\n\n')
     return
 

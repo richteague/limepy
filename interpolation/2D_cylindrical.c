@@ -194,7 +194,7 @@ double findvalue(double x, double y, double z, const double arr[NCELLS]){
 
     findcell(rad, alt, &aidx, &bidx, &cidx, &didx);
     if (aidx >= 0) {
-        return interpolation(c1, c2, aidx, bidx, cidx, didx, arr);
+        return interpolation(rad, alt, aidx, bidx, cidx, didx, arr);
     } else {
         return -1.;
     }
