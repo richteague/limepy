@@ -18,11 +18,59 @@ def writeHeaderString(array, name):
     return tosave
 
 
-def makeHeader(path, name=None):
+def make3DHeader(path, name=None):
+    """Write a LIME header for a 3D model."""
 
-    # Write the header.
-    # Make sure the orientation is correct.
-    # Remove values with a zero density.
+    if not type(path) is str:
+        raise TypeError("Must be a path to a model.")
+    if '.npy' in path:
+        data = np.load(path)
+    else:
+        data = np.loadtxt(path)
+
+    # Input array should have format: data.shape = (ntheta, params, ncells),
+    # where ncells = nrvals x nzvals, as in the 2D case. The params are:
+    #
+    #   0 - radius [au]
+    #   1 - altitude [au]
+    #   2 - density [g / cm^3]
+    #   3 - gas temperature [K]
+    #   4 - molecular abundance [wrt n(H2)]
+
+    if data.ndim == 2:
+        print "Found 2D model."
+        make2DHeader(path, name)
+        return
+    if not all([data.shape[1] <= d for d in data.shape]):
+        raise ValueError("Wrong array shape.")
+
+    # Note that density must be converted to LIME units [n(H2) / m^3].
+
+    data[:, 2] /= 2.37 * sc.m_p * 1e9
+
+    # Make sure that each column has a cell at the midplane: z = 0.
+
+    for aslice in data:
+        for r in np.unique(aslice[0]):
+            idx = aslice[1][aslice[0] == r].argmin()
+            aslice[1][idx] = 0.0
+
+    # Write the array names.
+
+    arrnames = ['c1arr', 'c2arr', 'c3arr', 'dens', 'temp', 'abund']
+    hstring = ''
+    for i, array in enumerate(data):
+            hstring += writeHeaderString(array, arrnames[i])
+
+    return data
+
+
+def make2DHeader(path, name=None):
+    """Write the header file."""
+
+    # Check to find the dimension of the input array. If arr.ndim == 2 then we
+    # assume that there is no azimuthal dependence. Otherwise, we write a two
+    # dimensional array for LIME.
 
     if not type(path) is str:
         raise TypeError("Must be path to chemical model.")
@@ -30,6 +78,7 @@ def makeHeader(path, name=None):
         data = np.loadtxt(path, skiprows=3).T
     else:
         data = np.loadtxt(path).T
+
     data = np.array([param[data[2] > 0] for param in data])
     if data.shape[0] > data.shape[1]:
         data = data.T
@@ -97,7 +146,9 @@ def makeHeader(path, name=None):
 
     return
 
-if len(sys.argv) == 2:
-    makeHeader(sys.argv[1])
-else:
-    makeHeader(sys.argv[1], sys.argv[2])
+
+if __name__ == '__main__':
+    if len(sys.argv) == 2:
+        make2DHeader(sys.argv[1])
+    else:
+        make2DHeader(sys.argv[1], sys.argv[2])
