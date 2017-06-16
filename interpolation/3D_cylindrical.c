@@ -29,7 +29,7 @@ int azimuthalbounds(double azi){
 int radialbounds(double rad, double apnt){
     int i;
     for (i=1; i<(NCELLS-1); i++) {
-        if (c3arr[i] == apnt) {
+        if (c3arr[i] == apnt && c3arr[i-1] == apnt) {
             if ((c1arr[i] - rad) * (c1arr[i-1] - rad) <= 0.) {
                 return i;
             }
@@ -42,8 +42,11 @@ int radialbounds(double rad, double apnt){
 int verticalbounds(double alt, double apnt, double rpnt){
     int i;
     for (i=1; i<(NCELLS-1); i++) {
-        if (c3arr[i] == apnt) {
-            if (c1arr[i] == rpnt) {
+        if (c3arr[i] == apnt and c1arr[i] == rpnt) {
+            if (alt == 0.0) {
+                return i + 1;
+            }
+            if (c3arr[i-1] == apnt and c1arr[i-1] == rpnt) {
                 if ((c2arr[i] - alt) * (c2arr[i-1] - alt) < 0.) {
                     return i;
                 }
@@ -87,7 +90,7 @@ double findvalue(double x, double y, double z, const double arr[NCELLS]){
     } else {
         zidx_a = verticalbounds(alt, c3arr[NCELLS-1], c1arr[ridx_a-1]);
         zidx_b = verticalbounds(alt, c3arr[NCELLS-1], c1arr[ridx_a]);
-    } 
+    }
     zidx_c = verticalbounds(alt, c3arr[aidx], c1arr[ridx_a-1]);
     zidx_d = verticalbounds(alt, c3arr[aidx], c1arr[ridx_a]);
     if (zidx_a < 0 || zidx_b < 0 || zidx_c < 0 || zidx_d < 0) {
