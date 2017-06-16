@@ -96,12 +96,12 @@ class model:
         try:
             self.dtemp = self.header.params['dtemp']
         except:
-            self.dtemp = kwargs.get('dtemp', None)
+            self.dtemp = kwargs.get('dtemp', 1.0)
 
         try:
             self.g2d = self.header.params['g2d']
         except:
-            self.g2d = kwargs.get('g2d', None)
+            self.g2d = kwargs.get('g2d', 100.)
 
         try:
             self.turb = self.header.params['turb']

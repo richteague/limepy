@@ -24,7 +24,8 @@ def makeFile(m, model):
     writeDensity(tempfile, model)
     writeTemperatures(tempfile, model)
     writeAbundance(tempfile, model)
-    writeGastoDust(tempfile, model)
+    if model.dust is not None:
+        writeGastoDust(tempfile, model)
     writeDoppler(tempfile, model)
     writeVelocityStructure(tempfile, model)
     with open('model_%d.c' % m, 'w') as tosave:
