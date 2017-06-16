@@ -19,7 +19,7 @@ int
 azimuthalbounds(double azi){
     int i = 0;
     for (i=0; i<(NCELLS-1); i++) {
-        if ((c3arr[i] - azi) * (c3arr[i-1] - azi <= 0.) {
+        if ((c3arr[i] - azi) * (c3arr[i-1] - azi <= 0.)) {
             return i;
         }
     }
