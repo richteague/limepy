@@ -17,7 +17,7 @@ linterpolate(double x, double xa, double xb, double ya, double yb){
 
 int
 azimuthalbounds(double azi){
-    int i = 0;
+    int i;
     for (i=1; i<(NCELLS-1); i++) {
         if ((c3arr[i] - azi) * (c3arr[i-1] - azi <= 0.)) {
             return i;
@@ -41,7 +41,7 @@ radialbounds(double rad, double apnt){
 
 int
 verticalbounds(double alt, double apnt, double rpnt){
-    int i:
+    int i;
     for (i=1; i<(NCELLS-1); i++) {
         if (c3arr[i] == apnt) {
             if (c1arr[i] == rpnt) {
@@ -72,7 +72,7 @@ findvalue(double x, double y, double z, const double arr[NCELLS]){
     int ridx_a = radialbounds(rad, c3arr[aidx-1]);
     int ridx_b = radialbounds(rad, c3arr[aidx]);
     if (ridx_a < 0 || ridx_b < 0) {
-        return -1.0
+        return -1.0;
     }
 
     // Vertical bounding index.
@@ -80,7 +80,7 @@ findvalue(double x, double y, double z, const double arr[NCELLS]){
     int zidx_b = verticalbounds(alt, c3arr[aidx-1], c1arr[ridx_a]);
     int zidx_c = verticalbounds(alt, c3arr[aidx], c1arr[ridx_a-1]);
     int zidx_d = verticalbounds(alt, c3arr[aidx], c1arr[ridx_a]);
-    if (zidx_a < 0 || zidx_b < 0 || zidx_c < 0 || zidx_d < 0){
+    if (zidx_a < 0 || zidx_b < 0 || zidx_c < 0 || zidx_d < 0) {
         return -1.0;
     }
 

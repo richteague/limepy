@@ -48,6 +48,7 @@ class readheader:
         # Make sure that the theta values are within the allow ranges:
         if self.ndim == 3:
             if self.params['c3arr'].min() < -np.pi:
+                print self.params['c3arr'].min(), -np.pi
                 raise ValueError('Minimum theta value outside range.')
             if self.params['c3arr'].max() >= np.pi:
                 raise ValueError('Maximum theta value outside range.')

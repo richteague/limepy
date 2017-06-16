@@ -52,7 +52,7 @@ def writeModelProperties(temp, model):
     temp.append('\tpar->nThreads = %d;\n' % model.nThreads)
     if model.gridOutFile:
         temp.append('\tpar->gridOutFiles[3] = "%s.ds";\n' % model.name)
-    temp.append('\n')
+    temp.append('\n\n')
     return
 
 
