@@ -120,7 +120,7 @@ def writeInterpolationFuncs(temp, model):
     with open(path+'%dD_%s.c' % (model.ndim, model.coordsys)) as f:
         lines = f.readlines()
     for line in lines:
-        temp.append(line.replace('NCELLS', '%d' % model.ncells))
+        temp.append(line.replace('NCELLS-1', '%d' % (model.ncells-1))
     temp.append('\n\n')
     return
 
