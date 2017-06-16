@@ -15,21 +15,21 @@ def run_model(headerfile, moldatfile, **kwargs):
     """ Run a LIME model. Check readme for possible kwargs and defaults."""
 
     # Start the clock to time the running of models.
-    
+
     print '\n'
     t0 = time.time()
     folder_name = makeUniqueFolder()
     os.chdir(folder_name)
 
     # Generate a LIME model class instance.
-    
+
     model = lime.model(headerfile, moldatfile, **kwargs)
     print '\nInput is in %dD-%s coordinates.' % (model.ndim, model.coordsys)
     print 'Assuming a value of minScale = %.2f au.' % model.minScale
     print 'Assuming a value of radius = %.2f au.' % model.radius
 
     # For each iteration, run a model with a pause of waittime seconds.
-    
+
     print '\n'
     for m in range(model.nmodels):
         print 'Running model %d of %d.' % (m+1, model.nmodels)

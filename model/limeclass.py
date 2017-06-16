@@ -9,14 +9,15 @@ there.
 The header file should provide the default values for the functions required by
 LIME. They will be read from the array names and must be one of:
 
-    'c1arr' - coordinate
-    'c2arr' - coordinate
+    'c1arr' - radial coordinate
+    'c2arr' - height coordinate
+    'c3arr' - azimuthal coordinate
     'dens'  - main collider density [/m^3]
     'temp'  - gas temperature [K]
     'dtemp' - dust temperature [K] (optional)
     'abund' - relative abundance of radiating species. (optional)
     'g2d'   - gas to dust ratio (optional)
-    'turb'  - non-thermal component [m/s or Mach] (optional)
+    'turb'  - non-thermal width component [m/s or Mach] (optional)
 
 In addition, the values of 'c1arr' and 'c2arr' will be used to estimate the
 values for 'par->radius' and 'par->minScale'.
@@ -61,33 +62,47 @@ class model:
 
         if not os.path.isfile('../'+header):
             raise ValueError('No header file found.')
+        else:
+            os.system('cp ../%s .' % header)
+            self.header = readheader(header)
+
         if not os.path.isfile(self.aux+rates):
             raise ValueError('No collisional rates found.')
+        else:
+            os.system('cp %s%s .' % (self.aux, rates))
+            self.moldatfile = rates
+            self.rates = ratefile(rates)
+
         if dust is not None:
             if not os.path.isfile(self.aux+dust):
                 raise ValueError('No dust opacities found.')
             os.system('cp %s%s .' % (self.aux, dust))
-        os.system('cp ../%s .' % header)
-        os.system('cp %s%s .' % (self.aux, rates))
-        self.header = readheader(header)
-        self.rates = ratefile(rates)
-        self.moldatfile = rates
-        self.dust = dust
+            self.dust = dust
 
         # Extract information from the header file.
+        # There is the minimum 5 columns while other are optional.
 
         self.c1arr = self.header.params['c1arr']
         self.c2arr = self.header.params['c2arr']
         self.dens = self.header.params['dens']
         self.temp = self.header.params['temp']
+        self.abund = self.header.params['abund']
+
         try:
-            self.abund = self.header.params['abund']
+            self.c3arr = self.header.params['c3arr']
         except:
-            self.abund = kwargs.get('abund', 1e-4)
+            self.c3arr = None
+
+        try:
+            self.dtemp = self.header.params['dtemp']
+        except:
+            self.dtemp = kwargs.get('dtemp', None)
+
         try:
             self.g2d = self.header.params['g2d']
         except:
-            self.g2d = kwargs.get('g2d', 100.)
+            self.g2d = kwargs.get('g2d', None)
+
         try:
             self.turb = self.header.params['turb']
         except:
@@ -95,12 +110,10 @@ class model:
         self.turbtype = kwargs.get('turbtype', 'absolute')
         if self.turbtype not in ['absolute', 'mach']:
             raise ValueError()
-        try:
-            self.dtemp = self.header.params['dtemp']
-        except:
-            self.dtemp = kwargs.get('dtemp', 1.0)
-        self.mstar = float(kwargs.get('mstar', 0.7))
 
+        # Extract values from the header to derive properties for LIME.
+
+        self.mstar = float(kwargs.get('mstar', 0.7))
         self.radius = self.header.rmax
         self.minScale = max(self.header.rmin, 1e-4)
         if self.minScale >= self.radius:

@@ -23,20 +23,16 @@ class readheader:
             raise ValueError('headerfile must have a *.h extention.')
 
         # Read in the header and parse all the information.
-
         with open(self.path+self.fn) as f:
             self.hdr = f.readlines()
-
         nlines = len(self.hdr)
         parsed = [self.parse_line(line) for line in self.hdr]
-
         self.anames = np.array([parsed[i][0] for i in range(nlines)])
         self.ncells = np.mean([parsed[i][1] for i in range(nlines)])
         self.params = {name: np.array(parsed[i][2])
                        for i, name in enumerate(self.anames)}
 
         # Determine the number of dimensions.
-
         if 'c1arr' not in self.anames:
             raise ValueError('No c1arr found.')
         if 'c2arr' not in self.anames:
@@ -47,8 +43,15 @@ class readheader:
             self.ndim = 2
 
         # Estimate the inner and outer radii required for LIME.
-
         self.rmin, self.rmax = self.estimate_grids()
+
+        # Make sure that the theta values are within the allow ranges:
+        if self.ndim == 3:
+            if self.params['c3arr'].min() < -np.pi:
+                raise ValueError('Minimum theta value outside range.')
+            if self.params['c3arr'].max() > np.pi:
+                raise ValueError('Maximum theta value outside range.')
+
         return
 
     def estimate_grids(self):

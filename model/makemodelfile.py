@@ -119,10 +119,7 @@ def writeInterpolationFuncs(temp, model):
     with open(path+'%dD_%s.c' % (model.ndim, model.coordsys)) as f:
         lines = f.readlines()
     for line in lines:
-        line = line.replace('NCELLS', '%d' % model.ncells)
-        if model.ndim == 3:
-            line = line.replace('NTHETA', '%d' % model.ntheta)
-        temp.append(line)
+        temp.append(line.replace('NCELLS', '%d' % model.ncells))
     temp.append('\n\n')
     return
 
@@ -131,7 +128,6 @@ def writeDensity(temp, model):
     """Main collider densities."""
     temp.append('void density(double x, double y,')
     temp.append('double z, double *density) {\n\n')
-    # writeCoords(temp, model)
     for i, val in enumerate(model.rescaledens):
         temp.append('\tdensity[%d] = %.2f *' % (i, val))
         temp.append(' findvalue(x, y, z, dens);\n')
@@ -145,7 +141,6 @@ def writeTemperatures(temp, model):
     """Gas and dust temperatures."""
     temp.append('void temperature(double x, double y, double z,')
     temp.append('double *temperature) {\n\n')
-    # writeCoords(temp, model)
     temp.append('\ttemperature[0] = findvalue(x, y, z, temp);\n')
     if model.rescaletemp:
         temp.append('\ttemperature[0] *= %.3f;\n' % model.rescaletemp)
@@ -169,7 +164,6 @@ def writeAbundance(temp, model):
     if type(model.abund) is float:
         temp.append('\tabundance[0] = %.3e;\n' * model.abund)
     else:
-        # writeCoords(temp, model)
         temp.append('\tabundance[0] = ')
         temp.append('findvalue(x, y, z, abund);\n' % model.abund)
     if model.depletion:
@@ -203,7 +197,6 @@ def writeGastoDust(temp, model, ming2d=1.):
     if type(model.g2d) is float:
         temp.append('\t*gtd = %.1f;\n\n' % model.g2d)
     else:
-        # writeCoords(temp, model)
         temp.append('\t*gtd = findvalue(x, y, z, g2d);\n\n')
     temp.append('\tif (*gtd < 1e-4) {\n\t\t*gtd = 1e-4;\n\t}\n}\n\n\n')
     return
