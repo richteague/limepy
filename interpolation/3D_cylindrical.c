@@ -42,11 +42,11 @@ int radialbounds(double rad, double apnt){
 int verticalbounds(double alt, double apnt, double rpnt){
     int i;
     for (i=1; i<(NCELLS-1); i++) {
-        if (c3arr[i] == apnt and c1arr[i] == rpnt) {
+        if (c3arr[i] == apnt && c1arr[i] == rpnt) {
             if (alt == 0.0) {
                 return i + 1;
             }
-            if (c3arr[i-1] == apnt and c1arr[i-1] == rpnt) {
+            if (c3arr[i-1] == apnt && c1arr[i-1] == rpnt) {
                 if ((c2arr[i] - alt) * (c2arr[i-1] - alt) < 0.) {
                     return i;
                 }
