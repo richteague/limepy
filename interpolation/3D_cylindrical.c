@@ -18,7 +18,7 @@ linterpolate(double x, double xa, double xb, double ya, double yb){
 int
 azimuthalbounds(double azi){
     int i = 0;
-    for (i=0; i<(NCELLS-1); i++) {
+    for (i=1; i<(NCELLS-1); i++) {
         if ((c3arr[i] - azi) * (c3arr[i-1] - azi <= 0.)) {
             return i;
         }
@@ -29,7 +29,7 @@ azimuthalbounds(double azi){
 int
 radialbounds(double rad, double apnt){
     int i;
-    for (i=0; i<(NCELLS-1); i++) {
+    for (i=1; i<(NCELLS-1); i++) {
         if (c3arr[i] == apnt) {
             if ((c1arr[i] - rad) * (c1arr[i-1] - rad) <= 0.) {
                 return i;
@@ -42,7 +42,7 @@ radialbounds(double rad, double apnt){
 int
 verticalbounds(double alt, double apnt, double rpnt){
     int i:
-    for (i=0; i<(NCELLS-1); i++) {
+    for (i=1; i<(NCELLS-1); i++) {
         if (c3arr[i] == apnt) {
             if (c1arr[i] == rpnt) {
                 if ((c2arr[i] - alt) * (c2arr[i-1] - alt) < 0.) {
