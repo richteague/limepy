@@ -18,7 +18,7 @@ double linterpolate(double x, double xa, double xb, double ya, double yb){
 int azimuthalbounds(double azi){
     int i;
     for (i=1; i<(NCELLS-1); i++) {
-        if ((c3arr[i] - azi) * (c3arr[i-1] - azi <= 0.)) {
+        if ((c3arr[i] - azi) * (c3arr[i-1] - azi) <= 0.) {
             return i;
         }
     }

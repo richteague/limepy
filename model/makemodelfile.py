@@ -64,6 +64,7 @@ def writeWeighting(temp, model):
         temp.append('\tpar->dustWeights[{}] = {};\n'.format(i, weight))
     for i, weight in enumerate(model.nMolWeights):
         temp.append('\tpar->nMolWeights[{}] = {};\n'.format(i, weight))
+    temp.append('\n\n')
     return
 
 
@@ -99,28 +100,13 @@ def writeImageBlock(temp, nimg, m, inc, pa, azi, trans, model):
     return
 
 
-'''
-def writeCoords(temp, model):
-    raise NotImplementedError
-    """Define the model coordinates for each function."""
-    if model.coordsys is not 'cylindrical':
-        raise NotImplementedError
-    if model.coordsys is 'cylindrical':
-        if model.ndim is 2:
-            temp.append('\tdouble c1 = sqrt(x*x + y*y) / AU;\n')
-            temp.append('\tdouble c2 = fabs(z) / AU;\n')
-            temp.append('\tdouble c3 = -1.;\n')
-    return
-'''
-
-
 def writeInterpolationFuncs(temp, model):
     """Include the interpolation functions for array inputs."""
     path = os.path.dirname(__file__).replace('model', 'interpolation/')
     with open(path+'%dD_%s.c' % (model.ndim, model.coordsys)) as f:
         lines = f.readlines()
     for line in lines:
-        temp.append(line.replace('NCELLS-1', '%d' % (model.ncells-1))
+        temp.append(line.replace('NCELLS', '%d' % model.ncells))
     temp.append('\n\n')
     return
 
