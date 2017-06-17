@@ -11,3 +11,17 @@ dimension can be added with `c3arr`, which is the azimuthal angle. With this,
 
 ## Running
 A standard call will be something like:
+
+```
+from limepy.model.runlime import run_model
+
+run_model(header='header.h',
+          name='filenames',
+          molecule='13co',
+          trans=[1, 2, 3],
+          incl=[0.4],
+          )
+```
+
+Most of the variables from LIME are able to be included. If lists of
+transitions, inclinations or position angles, all permutations will be made.
