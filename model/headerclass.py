@@ -46,6 +46,7 @@ class readheader:
         self.rmin, self.rmax = self.estimate_grids()
 
         # Make sure that the theta values are within the allow ranges:
+        # Note there's some issue with the rounding of values when saving.
         if self.ndim == 3:
             if self.params['c3arr'].min() < -np.pi:
                 print self.params['c3arr'].min(), -np.pi
