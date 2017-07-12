@@ -23,6 +23,16 @@ def moveFiles(model, prefix='0_', suffix='.fits'):
     return
 
 
+def moveGrids(model):
+    """Move the model grids."""
+    if not model.gridOutFile:
+        return
+    files = [fn for fn in os.listdir('./') if fn.endswith('.ds')]
+    for fn in files:
+        os.system('mv %s ../' % fn)
+    return
+
+
 def averageModels(model):
     """Average over all the models and save to 0_*.fits."""
     for i in model.incl:

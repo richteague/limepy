@@ -295,7 +295,7 @@ class outputgrid:
 
     def cell_intensity(self, trans, **kwargs):
         """Unattenuated intensity [Jy/sr] of each cell."""
-        source = kwargs.get('source', 'both')
+        source = kwargs.get('source', 'line')
         if source == 'line':
             return self._line_intensity(trans, **kwargs)
         elif source == 'dust':

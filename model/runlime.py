@@ -79,8 +79,7 @@ def run_model(headerfile, moldatfile, **kwargs):
 
     comb.averageModels(model)
     comb.moveFiles(model, suffix='.fits')
-    if model.gridOutFile:
-        comb.moveFiles(model, prefix='', suffix='.ds')
+    comb.moveGrids(model)
 
     # Clean up.
     os.chdir('../')
