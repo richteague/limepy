@@ -54,6 +54,13 @@ class readheader:
             if self.params['c3arr'].max() >= np.pi:
                 raise ValueError('Maximum theta value outside range.')
 
+        # Make some quick names to make it easier to plot the header files.
+        self.rvals = self.params['c1arr']
+        self.zvals = self.params['c2arr']
+        self.dens = self.params['dens']
+        self.temp = self.params['temp']
+        self.abun = self.params['abund']
+
         return
 
     def estimate_grids(self):

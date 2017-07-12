@@ -12,7 +12,7 @@ dimension can be added with `c3arr`, which is the azimuthal angle. With this,
 ## Running
 A standard call will be something like:
 
-```
+```python
 from limepy.model.runlime import run_model
 
 run_model(header='header.h',
@@ -25,3 +25,7 @@ run_model(header='header.h',
 
 Most of the variables from LIME are able to be included. If lists of
 transitions, inclinations or position angles, all permutations will be made.
+
+
+In order to increase the signal to noise of the data, one can run several
+models and then average over them using the `nmodels` keyword.

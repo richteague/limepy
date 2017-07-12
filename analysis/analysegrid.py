@@ -7,7 +7,6 @@ parameter in LIME. Only considers a face on viewing geometry.
 Functions to do:
 
     > Unit conversion to K.
-    > Include velocity structure.
     > Tidy up the masking.
     > Allow for a gas to dust function to be included rather than taking a
       disk-wide value, e.g. the default 100.
