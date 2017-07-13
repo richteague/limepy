@@ -104,7 +104,7 @@ class outputgrid:
         # Mask out all points with a total density of <= min_density, with a
         # default of 10^4. Include the depletion of the emitting molecule.
 
-        self.dmask = self.dens > kwargs.get('min_density', 1e4)
+        self.dmask = self.dens > kwargs.get('min_density', 1e3)
         self.xvals = self.xvals[self.dmask]
         self.yvals = self.yvals[self.dmask]
         self.zvals = self.zvals[self.dmask]
@@ -208,7 +208,7 @@ class outputgrid:
 
     def grid_param(self, param, method='linear'):
         """Return a gridded version of param."""
-        return griddata((np.hypot(self.xvals, self.yvals), self.zvals),
+        return griddata((self.rvals, self.zvals),
                         param, (self.xgrid[None, :], self.ygrid[:, None]),
                         method=method, fill_value=0.0)
 
