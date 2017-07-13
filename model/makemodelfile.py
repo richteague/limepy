@@ -70,13 +70,13 @@ def writeWeighting(temp, model):
 
 def writeImageParameters(temp, m, model):
     """Image parameters."""
+    nimg = 0
     for i, inc in enumerate(model.incl):
         for p, pa in enumerate(model.posang):
             for a, azi in enumerate(model.azimuth):
                 for t, trans in enumerate(model.transitions):
-                    nimg = t + (a + p + i) * model.ntra
-                    nimg += (p + i) * model.nazi + i * model.npos
                     writeImageBlock(temp, nimg, m, inc, pa, azi, trans, model)
+                    nimg += 1
     temp.append('}\n\n\n')
     return
 

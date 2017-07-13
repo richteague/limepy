@@ -52,7 +52,7 @@ import numpy as np
 
 class model:
 
-    def __init__(self, header, rates, dust='jena_thin_e6.tab', **kwargs):
+    def __init__(self, header, rates, dust=None, **kwargs):
 
         self.path = os.path.dirname(__file__)
         self.aux = self.path.replace('model', 'aux/')
@@ -73,11 +73,13 @@ class model:
             self.moldatfile = rates
             self.rates = ratefile(rates)
 
-        if dust is not None:
+        self.dust = dust
+        if self.dust is not None:
             if not os.path.isfile(self.aux+dust):
                 raise ValueError('No dust opacities found.')
             os.system('cp %s%s .' % (self.aux, dust))
             self.dust = dust
+        
 
         # Extract information from the header file.
         # There is the minimum 5 columns while other are optional.
