@@ -74,8 +74,10 @@ def writeFitsHeader(filename, model, inc, pa, azi):
 
 def getNoise(avgmodels, i, p, a, t, model):
     """Save the standard deviation of each voxel."""
+    if not model.returnnoise:
+        return
     noise = np.nanstd(avgmodels, axis=0)
     hdu = fits.open(filename(0, i, p, a, t))
     hdu[0].data = noise
-    hdu.writeto(filename(0, i, p, a, t)[:-5]+'_noise.fits')
+    hdu.writeto(filename(0, i, p, a, t).replace('.fits', '_noise.fits'))
     return
