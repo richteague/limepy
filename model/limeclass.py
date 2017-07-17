@@ -52,7 +52,7 @@ import numpy as np
 
 class model:
 
-    def __init__(self, header, rates, dust=None, **kwargs):
+    def __init__(self, header, rates, **kwargs):
 
         self.path = os.path.dirname(__file__)
         self.aux = self.path.replace('model', 'aux/')
@@ -73,12 +73,11 @@ class model:
             self.moldatfile = rates
             self.rates = ratefile(rates)
 
-        self.dust = dust
+        self.dust = kwargs.get('dust', None)
         if self.dust is not None:
-            if not os.path.isfile(self.aux+dust):
+            if not os.path.isfile(self.aux+self.dust):
                 raise ValueError('No dust opacities found.')
-            os.system('cp %s%s .' % (self.aux, dust))
-            self.dust = dust
+            os.system('cp %s%s .' % (self.aux, self.dust))
 
         # Extract information from the header file.
         # There is the minimum 5 columns while other are optional.
