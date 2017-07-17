@@ -79,7 +79,6 @@ class model:
                 raise ValueError('No dust opacities found.')
             os.system('cp %s%s .' % (self.aux, dust))
             self.dust = dust
-        
 
         # Extract information from the header file.
         # There is the minimum 5 columns while other are optional.
@@ -109,13 +108,13 @@ class model:
             self.turb = self.header.params['turb']
         except:
             self.turb = kwargs.get('turb', 0.0)
-        self.turbtype = kwargs.get('turbtype', 'absolute')
+        self.turbtype = kwargs.get('turbtype', 'mach')
         if self.turbtype not in ['absolute', 'mach']:
             raise ValueError()
 
         # Extract values from the header to derive properties for LIME.
 
-        self.mstar = float(kwargs.get('mstar', 0.7))
+        self.mstar = float(kwargs.get('mstar', 0.6))
         self.radius = self.header.rmax
         self.minScale = max(self.header.rmin, 1e-4)
         if self.minScale >= self.radius:
