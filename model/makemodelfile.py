@@ -60,8 +60,9 @@ def writeWeighting(temp, model):
     """Abundance and dust weighting values."""
     for i, cId in enumerate(model.collpartIds):
         temp.append('\tpar->collPartIds[{}] = {};\n'.format(i, cId))
-    for i, weight in enumerate(model.dustWeights):
-        temp.append('\tpar->dustWeights[{}] = {};\n'.format(i, weight))
+    if model.dust is not None:
+        for i, weight in enumerate(model.dustWeights):
+            temp.append('\tpar->dustWeights[{}] = {};\n'.format(i, weight))
     for i, weight in enumerate(model.nMolWeights):
         temp.append('\tpar->nMolWeights[{}] = {};\n'.format(i, weight))
     temp.append('\n\n')
