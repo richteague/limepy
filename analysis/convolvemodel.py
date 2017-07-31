@@ -10,8 +10,6 @@ Take a LIME model and then convolve it with a beam.
     bpa [optional]:     Position angle of the beam defined as the angle between
                         North and the major axis in an anticlockwise direction
                         in [degrees].
-    dist [optional]:    Distance to the source in [pc]. If None, default, will
-                        try and read the value from the header.
     fast [optional]:    If True, use FFT over normal convolution.
     output [optional]:  The name of the output files. If none is specified,
                         append the filename with bmin_bmaj_bpa.fits.
@@ -28,8 +26,7 @@ from astropy.io import fits
 from astropy.convolution import Kernel, convolve, convolve_fft
 
 
-def convolvecube(path, bmaj, bmin=None, bpa=0.0, dist=None, fast=True,
-                 output=None):
+def convolvecube(path, bmaj, bmin=None, bpa=0.0, fast=True, output=None):
     """Convolve a LIME model with a 2D Gaussian beam."""
     fn = path.split('/')[-1]
     dir = '/'.join(path.split('/')[:-1])+'/'

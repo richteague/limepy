@@ -93,10 +93,9 @@ class model:
         except:
             self.c3arr = None
 
-        # Dust temperature can either equal to the gas temperature,
-        # the default option, a gridded property through the 'dtemp'
-        # array, or a disk-wide rescaling of the gas temperature by
-        # using the 'dtemp' value.
+        # Dust temperature can either equal to the gas temperature, the default
+        # option, a gridded property through the 'dtemp' array, or a disk-wide
+        # rescaling of the gas temperature by using the 'dtemp' value.
 
         try:
             self.dtemp = self.header.params['dtemp']
@@ -108,14 +107,13 @@ class model:
         except:
             self.g2d = kwargs.get('g2d', 100.)
 
-        # Turbulence can either be specified through a single number
-        # which is taken to be a disk-wide value, or through an 
-        # array in the header file with the name 'turb'. With either
-        # method, a type has to be specified through 'turbtype'
-        # which must be either 'absolute', meaning the value is in
-        # [m/s], or 'mach', so that it is a fraction of the local
-        # soundspeed, the default being 'mach'. Note that the value
-        # in the header will override any value entered manually.
+        # Turbulence can either be specified through a single number which is
+        # taken to be a disk-wide value, or through an array in the header file
+        # with the name 'turb'. With either method, a type has to be specified
+        # through 'turbtype' which must be either 'absolute', meaning the value
+        # is in [m/s], or 'mach', so that it is a fraction of the local
+        # soundspeed, the default being 'mach'. Note that the value in the
+        # header will override any value entered manually.
 
         try:
             self.turb = self.header.params['turb']
