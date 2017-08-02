@@ -208,7 +208,7 @@ class model:
         self.nchan = int(kwargs.get('nchan', 100))
         self.velres = float(kwargs.get('velres', 200.))
         self.pxls = int(kwargs.get('pxls', 128))
-        self.distance = float(kwargs.get('distance', 1.))
+        self.distance = float(kwargs.get('distance', kwargs.get('dist', 1.)))
         self.source_vel = kwargs.get('source_vel', 0.0)
         self.imgres = float(kwargs.get('imgres', 0))
         if self.imgres == 0.0:
@@ -226,11 +226,11 @@ class model:
         self.transitions = checkiterable(self.transitions)
         self.ntra = len(self.transitions)
 
-        self.incl = kwargs.get('incl', [0.])
+        self.incl = kwargs.get('incl', kwargs.get('inc', [0.]))
         self.incl = checkiterable(self.incl)
         self.ninc = len(self.incl)
 
-        self.posang = kwargs.get('posang', [0.])
+        self.posang = kwargs.get('posang', kwargs.get('pa', [0.]))
         self.posang = checkiterable(self.posang)
         self.npos = len(self.posang)
 
@@ -250,7 +250,7 @@ class model:
         self.depletion = float(kwargs.get('depletion', False))
         self.oversample = int(kwargs.get('oversample', 1))
         self.niceness = kwargs.get('niceness', False)
-        self.waittime = kwargs.get('wait', 60.)
+        self.waittime = kwargs.get('waittime', kwargs.get('wait', 60.))
 
         # Additional variables to be updated.
 
