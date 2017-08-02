@@ -13,23 +13,26 @@ Take a LIME model and then convolve it with a beam.
     fast [optional]:    If True, use FFT over normal convolution.
     output [optional]:  The name of the output files. If none is specified,
                         append the filename with bmin_bmaj_bpa.fits.
-    retcube [optional]: If
-
-    -- Returns --
-
-    ccube [optional]    If returncube, will return the convolved cube.
+    hanning [optional]: If set, will Hanning smooth the spectral dimension of
+                        the data assuming the natural channel width of ALMA
+                        data is 15 kHz.
 
 """
 
 import numpy as np
 from astropy.io import fits
 from astropy.convolution import Kernel, convolve, convolve_fft
+from scipy.interpolate import interp1d
+import scipy.constants as sc
 
 
-def convolvecube(path, bmaj, bmin=None, bpa=0.0, fast=True, output=None):
+def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
+                 fast=True, output=None):
     """Convolve a LIME model with a 2D Gaussian beam."""
     fn = path.split('/')[-1]
     dir = '/'.join(path.split('/')[:-1])+'/'
+    if dir[0] == '/':
+        dir = dir[1:]
     data = fits.getdata(path)
 
     # Return the pixel scaling in [arcsec / pix].
@@ -51,6 +54,18 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, fast=True, output=None):
     else:
         ccube = np.array([convolve(c, beam) for c in data])
 
+    # Apply Hanning smoothing by default. TODO: Is there a way to speed this
+    # up rather than looping through each pixel?
+    if hanning:
+        kernel = hanningkernel(path)
+        if kernel.array.size > 1:
+            for i in range(ccube.shape[2]):
+                for j in range(ccube.shape[1]):
+                    if fast:
+                        ccube[:, j, i] = convolve_fft(ccube[:, j, i], kernel)
+                    else:
+                        ccube[:, j, i] = convolve(ccube[:, j, i], kernel)
+
     # Use the header of the input cube as the basis for the new cube.
     # Add in additional header keywords describing the beam.
     hdu = fits.open(path)
@@ -58,6 +73,8 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, fast=True, output=None):
     hdr['BMAJ'] = bmaj
     hdr['BMIN'] = bmin
     hdr['BPA'] = bpa
+    if hanning:
+        hdr['HANNING'] = 'TRUE'
     hdu[0].data = ccube
 
     # Save the file with the new filename.
@@ -66,6 +83,50 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, fast=True, output=None):
     print("Saving convolved cube to %s%s." % (dir, output))
     hdu.writeto(dir+output, overwrite=True, output_verify='fix')
     return
+
+
+def hanningkernel(fn, dcorr=15e3, npts=501):
+    """Returns the Hanning kernel with 15 kHz width."""
+    nu = fits.getval(fn, 'restfreq')
+    dcorr *= sc.c / nu
+    velax = readvelocityaxis(fn)
+    dchan = np.mean(np.diff(velax))
+    hanning = interp1d(np.linspace(-60, 60, npts), np.hanning(npts),
+                       bounds_error=False, fill_value=0.0)
+    kern = [hanning(i * dchan / dcorr) for i in range(velax.size)
+            if hanning(i * dchan / dcorr) > 0.0]
+    return Kernel(kern)
+
+
+def _velocityaxis(fn):
+    """Return velocity axis in [km/s]."""
+    a_len = fits.getval(fn, 'naxis3')
+    a_del = fits.getval(fn, 'cdelt3')
+    a_pix = fits.getval(fn, 'crpix3')
+    a_ref = fits.getval(fn, 'crval3')
+    return (a_ref + (np.arange(a_len) - a_pix + 1) * a_del) / 1e3
+
+
+def readvelocityaxis(fn):
+    """Wrapper for _velocityaxis and _spectralaxis."""
+    if fits.getval(fn, 'ctype3').lower() == 'freq':
+        specax = _spectralaxis(fn)
+        try:
+            nu = fits.getval(fn, 'restfreq')
+        except KeyError:
+            nu = fits.getval(fn, 'restfrq')
+        return (nu - specax) * sc.c / nu / 1e3
+    else:
+        return _velocityaxis(fn)
+
+
+def _spectralaxis(fn):
+    """Returns the spectral axis in [Hz]."""
+    a_len = fits.getval(fn, 'naxis3')
+    a_del = fits.getval(fn, 'cdelt3')
+    a_pix = fits.getval(fn, 'crpix3')
+    a_ref = fits.getval(fn, 'crval3')
+    return a_ref + (np.arange(a_len) - a_pix + 1) * a_del
 
 
 def readpositionaxis(fn):
