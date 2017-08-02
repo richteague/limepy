@@ -16,6 +16,7 @@ Take a LIME model and then convolve it with a beam.
     hanning [optional]: If set, will Hanning smooth the spectral dimension of
                         the data assuming the natural channel width of ALMA
                         data is 15 kHz.
+    dcorr [optional]:   Width of the Hanning smoothing kernel to use in [Hz].
 
 """
 
@@ -27,7 +28,7 @@ import scipy.constants as sc
 
 
 def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
-                 fast=True, output=None):
+                 fast=True, output=None, dcorr=15e3):
     """Convolve a LIME model with a 2D Gaussian beam."""
     fn = path.split('/')[-1]
     dir = '/'.join(path.split('/')[:-1])+'/'
@@ -37,6 +38,7 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
 
     # Return the pixel scaling in [arcsec / pix].
     dpix = np.mean(np.diff(readpositionaxis(path)))
+    print dpix
 
     # Make sure that the minimum and maximum values are in the correct order.
     if bmin is None:
@@ -54,6 +56,8 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
             ccube = np.array([convolve_fft(c, beam) for c in data])
         else:
             ccube = np.array([convolve(c, beam) for c in data])
+    else:
+        ccube = data
 
     # Apply Hanning smoothing by default. TODO: Is there a way to speed this
     # up rather than looping through each pixel?
@@ -72,11 +76,11 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
     # Add in additional header keywords describing the beam.
     hdu = fits.open(path)
     hdr = hdu[0].header
+    if hanning:
+        hdr['HANNING'] = dcorr, 'Width of correlator kernel.'
     hdr['BMAJ'] = bmaj
     hdr['BMIN'] = bmin
-    hdr['BPA'] = bpa
-    if hanning:
-        hdr['HANNING'] = 'TRUE'
+    hdr['BPA'] = bpa, 'Major axis, east from north.'
     hdu[0].data = ccube
 
     # Save the file with the new filename.
@@ -90,23 +94,14 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
 def hanningkernel(fn, dcorr=15e3, npts=501):
     """Returns the Hanning kernel with 15 kHz width."""
     nu = fits.getval(fn, 'restfreq')
-    dcorr *= sc.c / nu
+    dcorr *= sc.c / nu / 1e3
     velax = readvelocityaxis(fn)
     dchan = np.mean(np.diff(velax))
-    hanning = interp1d(np.linspace(-60, 60, npts), np.hanning(npts),
+    hanning = interp1d(np.linspace(-2, 2, npts), np.hanning(npts),
                        bounds_error=False, fill_value=0.0)
     kern = [hanning(i * dchan / dcorr) for i in range(velax.size)
             if hanning(i * dchan / dcorr) > 0.0]
     return Kernel(kern)
-
-
-def _velocityaxis(fn):
-    """Return velocity axis in [km/s]."""
-    a_len = fits.getval(fn, 'naxis3')
-    a_del = fits.getval(fn, 'cdelt3')
-    a_pix = fits.getval(fn, 'crpix3')
-    a_ref = fits.getval(fn, 'crval3')
-    return (a_ref + (np.arange(a_len) - a_pix + 1) * a_del) / 1e3
 
 
 def readvelocityaxis(fn):
@@ -120,6 +115,15 @@ def readvelocityaxis(fn):
         return (nu - specax) * sc.c / nu / 1e3
     else:
         return _velocityaxis(fn)
+
+
+def _velocityaxis(fn):
+    """Return velocity axis in [km/s]."""
+    a_len = fits.getval(fn, 'naxis3')
+    a_del = fits.getval(fn, 'cdelt3')
+    a_pix = fits.getval(fn, 'crpix3')
+    a_ref = fits.getval(fn, 'crval3')
+    return (a_ref + (np.arange(a_len) - a_pix + 1) * a_del) / 1e3
 
 
 def _spectralaxis(fn):
