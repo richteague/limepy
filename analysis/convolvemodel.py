@@ -48,17 +48,19 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
 
     # Calculate the beam kernel and convolve the cube.
     beam = beamkernel(bmaj, bmin, bpa, dpix)
-    print("Beginning convolution...")
-    if fast:
-        ccube = np.array([convolve_fft(c, beam) for c in data])
-    else:
-        ccube = np.array([convolve(c, beam) for c in data])
+    if beam.array.size > 1:
+        print("Beginning beam convolution...")
+        if fast:
+            ccube = np.array([convolve_fft(c, beam) for c in data])
+        else:
+            ccube = np.array([convolve(c, beam) for c in data])
 
     # Apply Hanning smoothing by default. TODO: Is there a way to speed this
     # up rather than looping through each pixel?
     if hanning:
         kernel = hanningkernel(path)
         if kernel.array.size > 1:
+            print("Beginning Hanning smoothing...")
             for i in range(ccube.shape[2]):
                 for j in range(ccube.shape[1]):
                     if fast:
