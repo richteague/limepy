@@ -244,7 +244,8 @@ class model:
         self.nmodels = int(kwargs.get('nmodels', 1))
         self.returnnoise = kwargs.get('returnnoise', False)
         if self.returnnoise and self.nmodels == 1:
-            raise ValueError()
+            self.returnnoise = 1
+            print("Only one model run, no noise will be returned.")
         self.rescaletemp = kwargs.get('rescaletemp', False)
         self.depletion = float(kwargs.get('depletion', False))
         self.oversample = int(kwargs.get('oversample', 1))
