@@ -16,7 +16,8 @@ Take a LIME model and then convolve it with a beam.
     hanning [optional]: If set, will Hanning smooth the spectral dimension of
                         the data assuming the natural channel width of ALMA
                         data is 15 kHz.
-    dcorr [optional]:   Width of the Hanning smoothing kernel to use in [Hz].
+    dcorr [optional]:   Width of the Hanning smoothing kernel to use.
+    chan [semi-opt]:    Unit of the width of the correlator kernel.
 
 """
 
@@ -28,7 +29,7 @@ import scipy.constants as sc
 
 
 def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
-                 fast=True, output=None, dcorr=15e3):
+                 fast=True, output=None, dcorr=2., unit='chan'):
     """Convolve a LIME model with a 2D Gaussian beam."""
     fn = path.split('/')[-1]
     dir = '/'.join(path.split('/')[:-1])+'/'
@@ -67,7 +68,7 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
     # Apply Hanning smoothing by default. TODO: Is there a way to speed this
     # up rather than looping through each pixel?
     if hanning:
-        kernel = hanningkernel(path)
+        kernel = hanningkernel(path, dcorr=dcorr, unit=unit)
         if kernel.array.size > 1:
             print("Beginning Hanning smoothing...")
             for i in range(ccube.shape[2]):
