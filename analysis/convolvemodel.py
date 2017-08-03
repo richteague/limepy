@@ -73,9 +73,11 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
             for i in range(ccube.shape[2]):
                 for j in range(ccube.shape[1]):
                     if fast:
-                        ccube[:, j, i] = convolve_fft(ccube[:, j, i], kernel)
+                        ccube[:, j, i] = convolve_fft(ccube[:, j, i], kernel,
+                                                      normalize_kernel=True)
                     else:
-                        ccube[:, j, i] = convolve(ccube[:, j, i], kernel)
+                        ccube[:, j, i] = convolve(ccube[:, j, i], kernel,
+                                                  normalize_kernel=True)
 
     # Use the header of the input cube as the basis for the new cube.
     # Add in additional header keywords describing the beam.
@@ -96,12 +98,16 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
     return
 
 
-def hanningkernel(fn, dcorr=15e3, npts=501):
-    """Returns the Hanning kernel with 15 kHz width."""
-    nu = fits.getval(fn, 'restfreq')
-    dcorr *= sc.c / nu / 1e3
+def hanningkernel(fn, dcorr=15.3e3, npts=501, unit='kHz'):
+    """Returns the Hanning kernel with given width."""
     velax = readvelocityaxis(fn)
-    dchan = np.mean(np.diff(velax))
+    dchan = abs(np.mean(np.diff(velax)))
+    if unit == 'kHz':
+        dcorr *= sc.c / fits.getval(fn, 'restfreq') / 1e3
+    elif unit == 'chan':
+        dcorr *= dchan
+    elif unit != 'km/s'
+        raise ValueError("Units must be 'kHz', 'chan' or 'km/s'.")
     hanning = interp1d(np.linspace(-2, 2, npts), np.hanning(npts),
                        bounds_error=False, fill_value=0.0)
     kern = [hanning(i * dchan / dcorr)
