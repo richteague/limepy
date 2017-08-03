@@ -98,7 +98,7 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
     return
 
 
-def hanningkernel(fn, dcorr=15.3e3, npts=501, unit='kHz'):
+def hanningkernel(fn, dcorr=2., npts=501, unit='chan'):
     """Returns the Hanning kernel with given width."""
     velax = readvelocityaxis(fn)
     dchan = abs(np.mean(np.diff(velax)))
@@ -106,7 +106,7 @@ def hanningkernel(fn, dcorr=15.3e3, npts=501, unit='kHz'):
         dcorr *= sc.c / fits.getval(fn, 'restfreq') / 1e3
     elif unit == 'chan':
         dcorr *= dchan
-    elif unit != 'km/s'
+    elif unit != 'km/s':
         raise ValueError("Units must be 'kHz', 'chan' or 'km/s'.")
     hanning = interp1d(np.linspace(-2, 2, npts), np.hanning(npts),
                        bounds_error=False, fill_value=0.0)
