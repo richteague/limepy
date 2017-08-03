@@ -65,6 +65,8 @@ def writeFitsHeader(filename, model, inc, pa, azi):
     header['NMODELS'] = model.nmodels, 'Number of models averaged.'
     header['OPR'] = model.opr, 'Ortho-para ratio of H2.'
     header['MSTAR'] = model.mstar, 'Mass of central star in Msun.'
+    if model.dust is not None:
+        header['DUSTK'] = model.dust, 'Dust opacities.'
     try:
         fits.writeto(filename, data, header, overwrite=True)
     except TypeError:

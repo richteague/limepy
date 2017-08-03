@@ -38,7 +38,6 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
 
     # Return the pixel scaling in [arcsec / pix].
     dpix = np.mean(np.diff(readpositionaxis(path)))
-    print dpix
 
     # Make sure that the minimum and maximum values are in the correct order.
     if bmin is None:
@@ -48,14 +47,20 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
         bmaj = bmin
         bmin = temp
 
-    # Calculate the beam kernel and convolve the cube.
-    beam = beamkernel(bmaj, bmin, bpa, dpix)
-    if beam.array.size > 1:
-        print("Beginning beam convolution...")
-        if fast:
-            ccube = np.array([convolve_fft(c, beam) for c in data])
+    # Calculate the beam kernel and convolve the cube. Two tests to see if it
+    # is worth while running the convolution: (a) is there a beam specified and
+    # (b) is the resulting kernel larger than a pixel?
+
+    if bmaj > 0.0:
+        beam = beamkernel(bmaj, bmin, bpa, dpix)
+        if beam.array.size > 1:
+            print("Beginning beam convolution...")
+            if fast:
+                ccube = np.array([convolve_fft(c, beam) for c in data])
+            else:
+                ccube = np.array([convolve(c, beam) for c in data])
         else:
-            ccube = np.array([convolve(c, beam) for c in data])
+            ccube = data
     else:
         ccube = data
 
@@ -77,10 +82,10 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
     hdu = fits.open(path)
     hdr = hdu[0].header
     if hanning:
-        hdr['HANNING'] = dcorr, 'Width of correlator kernel.'
+        hdr['HANNING'] = dcorr, 'Width of correlator kernel [Hz].'
     hdr['BMAJ'] = bmaj
     hdr['BMIN'] = bmin
-    hdr['BPA'] = bpa, 'Major axis, east from north.'
+    hdr['BPA'] = bpa, 'Major axis, east from north [deg].'
     hdu[0].data = ccube
 
     # Save the file with the new filename.
@@ -99,9 +104,10 @@ def hanningkernel(fn, dcorr=15e3, npts=501):
     dchan = np.mean(np.diff(velax))
     hanning = interp1d(np.linspace(-2, 2, npts), np.hanning(npts),
                        bounds_error=False, fill_value=0.0)
-    kern = [hanning(i * dchan / dcorr) for i in range(velax.size)
+    kern = [hanning(i * dchan / dcorr)
+            for i in range(-velax.size, velax.size+1)
             if hanning(i * dchan / dcorr) > 0.0]
-    return Kernel(kern)
+    return Kernel(np.squeeze(kern))
 
 
 def readvelocityaxis(fn):
@@ -140,7 +146,7 @@ def readpositionaxis(fn):
     a_len = fits.getval(fn, 'naxis2')
     a_del = fits.getval(fn, 'cdelt2')
     a_pix = fits.getval(fn, 'crpix2')
-    return 3600. * ((np.arange(1, a_len+1) - a_pix + 0.5) * a_del)
+    return 3600. * ((np.arange(1, a_len+1) - a_pix) * a_del)
 
 
 def beamkernel(bmaj, bmin, bpa, dpix):

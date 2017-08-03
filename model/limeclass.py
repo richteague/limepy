@@ -207,7 +207,7 @@ class model:
 
         self.nchan = int(kwargs.get('nchan', 100))
         self.velres = float(kwargs.get('velres', 200.))
-        self.pxls = int(kwargs.get('pxls', 128))
+        self.pxls = int(kwargs.get('pxls', kwargs.get('npix', 128)))
         self.distance = float(kwargs.get('distance', kwargs.get('dist', 1.)))
         self.source_vel = kwargs.get('source_vel', 0.0)
         self.imgres = float(kwargs.get('imgres', 0))

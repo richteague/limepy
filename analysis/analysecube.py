@@ -228,7 +228,7 @@ class cube:
         cont = self.data[cchan].copy()
         if not all([np.isclose(np.sum(cont - self.data[i]), 0)
                     for i in [1, -1, -2]]):
-            print('Potential line emission in continuum channels.')
+            print('Emission in edge channels.')
         line = np.array([chan - cont for chan in self.data])
         return cont, line
 
