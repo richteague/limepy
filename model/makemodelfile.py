@@ -46,6 +46,7 @@ def writeModelProperties(temp, model):
     if model.dust is not None:
         temp.append('\tpar->dust = "%s";\n' % model.dust)
     temp.append('\tpar->lte_only = %d;\n' % model.lte_only)
+    temp.append('\tpar->nSolveIters = 17;\n')
     temp.append('\tpar->blend = %d;\n' % model.blend)
     temp.append('\tpar->antialias = %d;\n' % model.antialias)
     temp.append('\tpar->traceRayAlgorithm = %d;\n' % model.traceRayAlgorithm)
