@@ -128,12 +128,11 @@ class model:
         # Keplerian rotation. If 'mstar' is provided in addition to 'vrot' in
         # the header file, we default to Keplerian rotation.
 
-        try:
-            self.vrot = self.header.params['vrot']
-            self.mstar = kwargs.get('mstar', None)
-        except:
-            self.vrot = None
+        self.vrot = self.header.params['vrot']
+        if self.vrot is not None:
             self.mstar = kwargs.get('mstar', 0.6)
+        else:
+            self.mstar = kwargs.get('mstar', None)
 
         # Extract values from the header to derive properties for LIME.
 

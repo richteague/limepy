@@ -61,6 +61,11 @@ class readheader:
         self.temp = self.params['temp']
         self.abun = self.params['abund']
 
+        if 'vrot' in self.anames:
+            self.vrot = self.params['vrot']
+        else:
+            self.vrot = None
+
         return
 
     def estimate_grids(self):
