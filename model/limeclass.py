@@ -130,10 +130,10 @@ class model:
 
         try:
             self.vrot = self.header.params['vrot']
-            self.mdisk = kwargs.get('mstar', None)
+            self.mstar = kwargs.get('mstar', None)
         except:
             self.vrot = None
-            self.mdisk = kwargs.get('mstar', 0.6)
+            self.mstar = kwargs.get('mstar', 0.6)
 
         # Extract values from the header to derive properties for LIME.
 
