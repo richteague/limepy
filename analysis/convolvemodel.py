@@ -74,11 +74,9 @@ def convolvecube(path, bmaj, bmin=None, bpa=0.0, hanning=True,
             for i in range(ccube.shape[2]):
                 for j in range(ccube.shape[1]):
                     if fast:
-                        ccube[:, j, i] = convolve_fft(ccube[:, j, i], kernel,
-                                                      normalize_kernel=True)
+                        ccube[:, j, i] = convolve_fft(ccube[:, j, i], kernel)
                     else:
-                        ccube[:, j, i] = convolve(ccube[:, j, i], kernel,
-                                                  normalize_kernel=True)
+                        ccube[:, j, i] = convolve(ccube[:, j, i], kernel)
 
     # Use the header of the input cube as the basis for the new cube.
     # Add in additional header keywords describing the beam.

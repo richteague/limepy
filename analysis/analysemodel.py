@@ -151,8 +151,8 @@ class outputgrid:
         """Normalised cell contribution to the observed emission."""
         contrib = self.cell_emission(trans, **kwargs)
         contrib = contrib / np.nansum(contrib, axis=0)
-        mincont = kwargs.get('mintcont', 1e-5)
-        return np.where(contrib < mincont, mincont, contrib)
+        mincont = kwargs.get('mintcont', 1e-15)
+        return np.where(abs(contrib) < mincont, mincont, contrib)
 
     def _both_intensity(self, trans, **kwargs):
         """Cell intensity [Jy/sr] for both line and dust emission."""
@@ -288,7 +288,7 @@ class outputgrid:
         """Flux weighted percentiles of physical property."""
         if param not in self.gridded.keys():
             raise ValueError('Not valid parameter.')
-        s = kwargs.get('source', 'both')
+        s = kwargs.get('source', 'line')
         f = self.cell_contribution(level, source=s)
         v = self.gridded[param]
         if self.xgrid.size > 1:
@@ -337,7 +337,7 @@ class outputgrid:
         """Percentiles for the dominant emission layer [au]."""
         f = self.cell_contribution(trans, **kwargs)
         if self.xgrid.size > 1:
-            p = np.array([self.wpercentiles(abs(self.ygrid), f[:, i])
+            p = np.array([self.wpercentiles(self.ygrid, f[:, i])
                           for i in xrange(self.xgrid.size)])
             if kwargs.get('percentiles', False):
                 return p.T
@@ -351,7 +351,7 @@ class outputgrid:
         """Percentiles for the dominant emission layer [au]."""
         f = self.gridded['abun'] * self.gridded['dens']
         f *= self.cellsize(self.ygrid)
-        p = np.array([self.wpercentiles(abs(self.ygrid), f[:, i])
+        p = np.array([self.wpercentiles(self.ygrid, f[:, i])
                       for i in xrange(self.xgrid.size)])
         if kwargs.get('percentiles', False):
             return p.T

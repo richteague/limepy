@@ -130,9 +130,9 @@ class model:
 
         self.vrot = self.header.params['vrot']
         if self.vrot is not None:
-            self.mstar = kwargs.get('mstar', 0.6)
-        else:
             self.mstar = kwargs.get('mstar', None)
+        else:
+            self.mstar = kwargs.get('mstar', 0.6)
 
         # Extract values from the header to derive properties for LIME.
 

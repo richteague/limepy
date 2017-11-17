@@ -31,10 +31,13 @@ class cube:
         self.posax = self.readpositionaxis()
         self.npix = self.posax.size
         self.dpix = np.diff(self.posax).mean()
-        try:
-            self.nu = fits.getval(self.filename, 'restfreq', 0)
-        except KeyError:
-            self.nu = fits.getval(self.filename, 'restfrq', 0)
+        if not kwargs.get('restfreq', False):
+            try:
+                self.nu = fits.getval(self.filename, 'restfreq', 0)
+            except KeyError:
+                self.nu = fits.getval(self.filename, 'restfrq', 0)
+        else:
+            self.nu = kwargs.get('restfreq')
         if fits.getval(self.filename, 'ctype3').lower() == 'freq':
             self.specax = self.readspectralaxis()
             self.velax = (self.nu - self.specax) * sc.c / self.nu / 1e3
@@ -185,7 +188,7 @@ class cube:
         bins = self.radialbins(bins=bins, nbins=nbins)
         zeroth = self.zerothmoment(**kwargs).ravel()
         ridxs = np.digitize(self.rvals.ravel(), bins)
-        pvals = kwargs.get('percentiles', [0.16, 0.5, 0.84])
+        pvals = kwargs.get('percentiles', [16, 50, 84])
         rpnts = np.mean([bins[1:], bins[:-1]], axis=0)
         percentiles = [np.percentile(zeroth[ridxs == r], pvals)
                        for r in range(1, bins.size)]
