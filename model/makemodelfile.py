@@ -206,7 +206,7 @@ def writeVelocityStructure(temp, model):
         temp.append('\tvelo = sqrt(6.67e-11 * %.3f' % model.mstar)
         temp.append(' * 1.989e30 / sqrt(x*x + y*y + z*z));\n')
     else:
-        temp.append('\tdouble velo = findvalue(x, y, x, vrot);\n')
+        temp.append('\tvelo = findvalue(x, y, x, vrot);\n')
     temp.append('\tvelocity[0] = velo * sin(atan2(y,x));\n')
     temp.append('\tvelocity[1] = velo * cos(atan2(y,x));\n')
     temp.append('\tvelocity[2] = 0.0;\n')
