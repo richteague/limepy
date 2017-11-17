@@ -128,7 +128,7 @@ def writeDensity(temp, model):
 
 def writeTemperatures(temp, model):
     """Gas and dust temperatures."""
-    temp.append('void temperature(double x, double y, double z,')
+    temp.append('void temperature(double x, double y, double z, ')
     temp.append('double *temperature) {\n\n')
     temp.append('\ttemperature[0] = findvalue(x, y, z, temp);\n')
     if model.rescaletemp:
@@ -201,14 +201,14 @@ def writeVelocityStructure(temp, model):
     temp.append('\t\tvelocity[2] = 0.0;\n')
     temp.append('\t\t return;\n')
     temp.append('\t}\n\n')
-    temp.append('\tvelocity[0] = sqrt(6.67e-11 * ')
-    temp.append('%.3f * 1.989e30 / ' % model.mstar)
-    temp.append('sqrt(x*x + y*y + z*z));\n')
-    temp.append('\tvelocity[0] *= sin(atan2(y,x));\n')
-    temp.append('\tvelocity[1] = sqrt(6.67e-11 * ')
-    temp.append('%.3f * 1.989e30 / ' % model.mstar)
-    temp.append('sqrt(x*x + y*y + z*z));\n')
-    temp.append('\tvelocity[1] *= cos(atan2(y,x));\n')
+    temp.append('\tdouble velo;\n')
+    if model.mstar is not None:
+        temp.append('\tvelo = sqrt(6.67e-11 * %.3f' % model.mstar)
+        temp.append(' * 1.989e30 / sqrt(x*x + y*y + z*z));\n')
+    else:
+        temp.append('\tdouble velo = findvalue(x, y, x, vrot);\n')
+    temp.append('\tvelocity[0] = velo * sin(atan2(y,x));\n')
+    temp.append('\tvelocity[1] = velo * cos(atan2(y,x));\n')
     temp.append('\tvelocity[2] = 0.0;\n')
     temp.append('\n}\n\n\n')
     return

@@ -123,9 +123,20 @@ class model:
         if self.turbtype not in ['absolute', 'mach']:
             raise ValueError()
 
+        # For the rotation of the disk, we first check for the 'vrot' parameter
+        # in the header file. If nothing is found we revert to cylindrical
+        # Keplerian rotation. If 'mstar' is provided in addition to 'vrot' in
+        # the header file, we default to Keplerian rotation.
+
+        try:
+            self.vrot = self.header.params['vrot']
+            self.mdisk = kwargs.get('mstar', None)
+        except:
+            self.vrot = None
+            self.mdisk = kwargs.get('mstar', 0.6)
+
         # Extract values from the header to derive properties for LIME.
 
-        self.mstar = float(kwargs.get('mstar', 0.6))
         self.radius = self.header.rmax
         self.minScale = max(self.header.rmin, 1e-4)
         if self.minScale >= self.radius:
