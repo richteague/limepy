@@ -46,7 +46,8 @@ def writeModelProperties(temp, model):
     if model.dust is not None:
         temp.append('\tpar->dust = "%s";\n' % model.dust)
     temp.append('\tpar->lte_only = %d;\n' % model.lte_only)
-    temp.append('\tpar->nSolveIters = 17;\n')
+    if not model.lte_only:
+        temp.append('\tpar->nSolveIters = 7;\n')
     temp.append('\tpar->blend = %d;\n' % model.blend)
     temp.append('\tpar->antialias = %d;\n' % model.antialias)
     temp.append('\tpar->traceRayAlgorithm = %d;\n' % model.traceRayAlgorithm)
@@ -206,7 +207,7 @@ def writeVelocityStructure(temp, model):
         temp.append('\tvelo = sqrt(6.67e-11 * %.3f' % model.mstar)
         temp.append(' * 1.989e30 / sqrt(x*x + y*y + z*z));\n')
     else:
-        temp.append('\tvelo = findvalue(x, y, x, vrot);\n')
+        temp.append('\tvelo = findvalue(x, y, z, vrot);\n')
     temp.append('\tvelocity[0] = velo * sin(atan2(y,x));\n')
     temp.append('\tvelocity[1] = velo * cos(atan2(y,x));\n')
     temp.append('\tvelocity[2] = 0.0;\n')

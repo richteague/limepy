@@ -119,7 +119,7 @@ class model:
             self.turb = self.header.params['turb']
         except:
             self.turb = kwargs.get('turb', 0.0)
-        self.turbtype = kwargs.get('turbtype', 'mach')
+        self.turbtype = kwargs.get('turbtype', 'absolute')
         if self.turbtype not in ['absolute', 'mach']:
             raise ValueError()
 
@@ -227,14 +227,17 @@ class model:
         if self.unit not in [0, 1, 2, 3]:
             raise ValueError('unit must be 0, 1, 2 or 3.')
 
+        # Name of the final output file.
+
         self.name = kwargs.get('name', header)
         self.name = self.name.split('/')[-1]
-        if '.' in self.name:
-            self.name = ''.join(self.name.split('.')[:-1])
+        self.name = self.name.replace('.', '')
 
         self.transitions = kwargs.get('transitions', [0])
         self.transitions = checkiterable(self.transitions)
         self.ntra = len(self.transitions)
+
+        # Viewing geometry.
 
         self.incl = kwargs.get('incl', kwargs.get('inc', [0.]))
         self.incl = checkiterable(self.incl)
