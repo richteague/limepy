@@ -34,9 +34,12 @@ ortho-H2 and para-H2 collisional rates these will be used in preference over H2
 rates. The density will be split using the 'opr' value. The user can try and
 force the use of H2 with the 'useH2' keyword.
 
+For the imaging we can also account for the effects raised in Rosenfeld++ 2013
+by oversampling the image and then averaging over the channels. We can also
+include Hanning smoothing to the final image.
+
 Functions to do:
 
-    > Allow the inclusion of 'vel1', 'vel2' and 'vel3' in the header.
     > Allow for other coordinate systems other than cylindrical.
     > Allow for non-H2 main colliders.
     > Take advantage of multiple units to be ray traced.
