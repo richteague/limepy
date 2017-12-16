@@ -77,6 +77,8 @@ def run_model(headerfile, moldatfile, **kwargs):
     # Combine the model ensemble. Here we remove all the output grids. As they
     # all have the same name, they will just be overwritten.
 
+    if model.oversample > 1:
+        comb.downsampleModels(model)
     comb.averageModels(model)
     comb.moveFiles(model, suffix='.fits')
     comb.moveGrids(model)

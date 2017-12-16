@@ -54,6 +54,64 @@ def averageModels(model):
     return
 
 
+def downsampleModels(model):
+    """Downsample all the models and include Hanning smoothing."""
+    for fn in os.listdir('./'):
+        if not fn.endswith('.fits'):
+            continue
+
+        # Read in the data and account for the stokes axis.
+
+        hdu = fits.open(fn)
+        data = hdu[0].data
+        if data.ndim == 4:
+            data = np.squeeze(data)
+            stokes = True
+        else:
+            stokes = False
+
+        # Generate the velocity axis in order to rescale this.
+
+        velax = hdu[0].header['crval3'] - hdu[0].header['crpix3'] + 1.0
+        velax = hdu[0].header['cdelt3'] * (velax + np.arange(data.shape[0]))
+
+        # Average over the requested number of channels.
+
+        N = model.oversample
+        data = np.squeeze([np.average(data[i:i+N], axis=0)
+                           for i in range(0, data.shape[0], N)])
+
+        # Apply hanning smoothing if appropriate.
+
+        if model.hanning:
+
+            def hanning_smooth(s):
+                """Hanning smooth array s."""
+                s1 = np.convolve(s, [0.25, 0.5, 0.25], mode='same')
+                s2 = np.convolve(s[::-1], [0.25, 0.5, 0.25], mode='same')[::-1]
+                return np.average([s1, s2], axis=0)
+
+            data = np.apply_along_axis(hanning_smooth, axis=0, arr=data)
+
+        velax = velax[N/2::N]
+
+        # Add back in the Stokes axis if there was one before saving.
+
+        if stokes:
+            data = data[None, :, :, :]
+        hdu[0].data = data
+        crval3 = hdu[0].header['crval3']
+        crpix3 = np.interp(crval3, velax, np.arange(velax.size) + 1)
+        hdu[0].header['crpix3'] = crpix3
+        hdu[0].header['cdelt3'] = N * hdu[0].header['cdelt3']
+
+        try:
+            hdu.writeto(fn, overwrite=True)
+        except:
+            hdu.writeto(fn, clobber=True)
+    return
+
+
 def writeFitsHeader(filename, model, inc, pa, azi):
     """Include model data in the final .fits file header."""
     data, header = fits.getdata(filename, header=True)

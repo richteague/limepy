@@ -262,16 +262,13 @@ class model:
         self.rescaletemp = kwargs.get('rescaletemp', False)
         self.depletion = float(kwargs.get('depletion', False))
         self.oversample = int(kwargs.get('oversample', 1))
+        self.hanning = kwargs.get('hanning', False)
         self.niceness = kwargs.get('niceness', False)
         self.waittime = kwargs.get('waittime', kwargs.get('wait', 60.))
 
         # Additional variables to be updated.
 
         self.tcmb = kwargs.get('tcmb', 2.73)
-
-        self.molI = kwargs.get('molI', None)
-        if self.molI is not None:
-            raise NotImplementedError()
 
         self.freq = kwargs.get('freq', None)
         if self.freq is not None:
