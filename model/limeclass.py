@@ -234,7 +234,7 @@ class model:
 
         self.name = kwargs.get('name', header)
         self.name = self.name.split('/')[-1]
-        self.name = self.name.replace('.', '')
+        self.name = self.name.replace('.h', '')
 
         self.transitions = kwargs.get('transitions', [0])
         self.transitions = checkiterable(self.transitions)
@@ -264,14 +264,25 @@ class model:
             print("Only one model run, no noise will be returned.")
         self.rescaletemp = kwargs.get('rescaletemp', False)
         self.depletion = float(kwargs.get('depletion', False))
+
+        # Imaging corrections based on Rosenfeld et al. (2013).
+        # Note that if oversample is used, will vastly increase time.
+
         self.oversample = int(kwargs.get('oversample', 1))
+        if self.oversample > 1:
+            print("Oversample velocity axis by %d." % self.oversample)
+            print("Will take longer than usual to ray-trace.")
         self.hanning = kwargs.get('hanning', False)
+        if self.hanning:
+            print("Hanning smoothing will be included.")
         self.niceness = kwargs.get('niceness', False)
         self.waittime = kwargs.get('waittime', kwargs.get('wait', 60.))
 
         # Additional variables to be updated.
 
         self.tcmb = kwargs.get('tcmb', 2.73)
+
+        # Remove the option for continuum only observations.
 
         self.freq = kwargs.get('freq', None)
         if self.freq is not None:
