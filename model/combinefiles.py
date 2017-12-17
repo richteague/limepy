@@ -56,6 +56,9 @@ def averageModels(model):
 
 def downsampleModels(model):
     """Downsample all the models and include Hanning smoothing."""
+
+    # Loop through all available files.
+
     for fn in os.listdir('./'):
         if not fn.endswith('.fits'):
             continue
@@ -69,11 +72,6 @@ def downsampleModels(model):
             stokes = True
         else:
             stokes = False
-
-        # Generate the velocity axis in order to rescale this.
-
-        velax = hdu[0].header['crval3'] - hdu[0].header['crpix3'] + 1.0
-        velax = hdu[0].header['cdelt3'] * (velax + np.arange(data.shape[0]))
 
         # Average over the requested number of channels.
 
@@ -93,22 +91,31 @@ def downsampleModels(model):
 
             data = np.apply_along_axis(hanning_smooth, axis=0, arr=data)
 
-        velax = velax[N/2::N]
-
         # Add back in the Stokes axis if there was one before saving.
 
         if stokes:
             data = data[None, :, :, :]
         hdu[0].data = data
-        crval3 = hdu[0].header['crval3']
-        crpix3 = np.interp(crval3, velax, np.arange(velax.size) + 1)
+
+        # Calculate the change in velocity axis. The rounding is to try and
+        # keep the velocity axis the same, even when an odd number is used for
+        # the oversampling.
+
+        rval = hdu[0].header['crval3']
+        rpix = hdu[0].header['crpix3']
+        delt = hdu[0].header['cdelt3']
+        npix = hdu[0].header['naxis3']
+
+        velax = delt * ((rval - rpix + 1.0) + np.arange(npix))[N/2::N]
+        crpix3 = np.interp(rval, velax, np.arange(velax.size) + 1)
         hdu[0].header['crpix3'] = np.round(crpix3)
-        hdu[0].header['cdelt3'] = np.round(N * hdu[0].header['cdelt3'])
+        hdu[0].header['cdelt3'] = np.round(N * delt)
 
         try:
             hdu.writeto(fn, overwrite=True)
         except:
             hdu.writeto(fn, clobber=True)
+
     return
 
 
