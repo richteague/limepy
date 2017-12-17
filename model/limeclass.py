@@ -270,8 +270,8 @@ class model:
 
         self.oversample = int(kwargs.get('oversample', 1))
         if self.oversample > 1:
-            print("Oversample velocity axis by %d." % self.oversample)
-            print("Will take longer than usual to ray-trace.")
+            print("Increasing velocity sampling by %d." % self.oversample)
+            print("Will therefore take longer than usual to ray-trace.")
         self.hanning = kwargs.get('hanning', False)
         if self.hanning:
             print("Hanning smoothing will be included.")

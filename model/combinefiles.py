@@ -102,7 +102,7 @@ def downsampleModels(model):
         hdu[0].data = data
         crval3 = hdu[0].header['crval3']
         crpix3 = np.interp(crval3, velax, np.arange(velax.size) + 1)
-        hdu[0].header['crpix3'] = crpix3
+        hdu[0].header['crpix3'] = np.round(crpix3)
         hdu[0].header['cdelt3'] = N * hdu[0].header['cdelt3']
 
         try:
