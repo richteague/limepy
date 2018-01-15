@@ -113,6 +113,11 @@ class ratefile:
 
         self.partners = [x for x in self.rates.keys() if type(x) == str]
 
+        # Estimate the rotational constant [K].
+
+        self.B0 = [J * (J + 1.) * self.levels[J + 1].E for J in range(1, 5)]
+        self.B0 = np.nanmean(self.B0)
+
         return
 
     def populate_levels(self, line):
