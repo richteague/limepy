@@ -115,8 +115,8 @@ class ratefile:
 
         # Estimate the rotational constant [K].
 
-        self.B0 = [J * (J + 1.) * self.levels[J + 1].E for J in range(1, 5)]
-        self.B0 = np.nanmean(self.B0)
+        self.B0 = [self.lines[J].Eup / J / (J + 1.) for J in range(1, 5)]
+        self.B0 = np.median(self.B0)
 
         return
 
